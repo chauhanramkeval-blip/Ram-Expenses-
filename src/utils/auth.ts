@@ -3,6 +3,7 @@ import { UserAccount } from "../types";
 export const LOCAL_STORAGE_USERS_KEY = "khata_users_list_v2";
 export const LOCAL_STORAGE_CURRENT_USER_KEY = "khata_current_user_v2";
 export const LOCAL_STORAGE_AUTH_STATE_KEY = "khata_auth_state_v2";
+export const LOCAL_STORAGE_ONBOARDING_KEY = "khata_onboarding_completed_v2";
 
 export const DEFAULT_USERS: UserAccount[] = [
   {
@@ -16,6 +17,10 @@ export const DEFAULT_USERS: UserAccount[] = [
     joinedDate: "Aug 2024",
     lastLogin: "Today, Active",
     authProvider: "google",
+    pin: "1234",
+    password: "khata",
+    securityQuestion: "What is your favorite city?",
+    securityAnswer: "Mumbai",
   },
   {
     id: "user-priya",
@@ -28,6 +33,10 @@ export const DEFAULT_USERS: UserAccount[] = [
     joinedDate: "Sep 2024",
     lastLogin: "Yesterday",
     authProvider: "email",
+    pin: "2024",
+    password: "priya",
+    securityQuestion: "What is your pet's name?",
+    securityAnswer: "Bruno",
   },
   {
     id: "user-sharmastore",
@@ -40,6 +49,10 @@ export const DEFAULT_USERS: UserAccount[] = [
     joinedDate: "Jul 2024",
     lastLogin: "3 days ago",
     authProvider: "phone",
+    pin: "9988",
+    password: "store",
+    securityQuestion: "What is the store registration code?",
+    securityAnswer: "12345",
   },
 ];
 
@@ -49,7 +62,12 @@ export function getStoredUsers(): UserAccount[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Ensure all loaded users have pin & password defaults
+        return parsed.map((u: UserAccount, idx: number) => ({
+          ...u,
+          pin: u.pin || (idx === 1 ? "2024" : idx === 2 ? "9988" : "1234"),
+          password: u.password || "khata",
+        }));
       }
     }
   } catch (e) {
@@ -85,16 +103,37 @@ export function getStoredCurrentUser(): UserAccount {
   return defaultUser;
 }
 
+export function isOnboardingCompleted(): boolean {
+  try {
+    const val = localStorage.getItem(LOCAL_STORAGE_ONBOARDING_KEY);
+    return val === "true";
+  } catch (e) {
+    return false;
+  }
+}
+
+export function setOnboardingCompleted(completed: boolean): void {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_ONBOARDING_KEY, completed ? "true" : "false");
+  } catch (e) {
+    console.error("Error saving onboarding state", e);
+  }
+}
+
 export function getStoredAuthState(): boolean {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_AUTH_STATE_KEY);
     if (raw !== null) {
       return raw === "true";
     }
+    // If onboarding hasn't been completed yet, default to false (show signup popup)
+    if (!isOnboardingCompleted()) {
+      return false;
+    }
   } catch (e) {
     console.error("Error reading auth state", e);
   }
-  return true; // Default logged in for seamless start
+  return true;
 }
 
 export function setStoredAuthState(isLoggedIn: boolean): void {
@@ -123,3 +162,27 @@ export function getInitials(name: string): string {
   if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
+
+export function getUserEffectivePin(user?: UserAccount): string {
+  if (!user) return "1234";
+  return user.pin || "1234";
+}
+
+export function getUserEffectivePassword(user?: UserAccount): string {
+  if (!user) return "khata";
+  return user.password || "khata";
+}
+
+export function verifyUserPin(user: UserAccount, enteredPin: string): boolean {
+  const expectedPin = getUserEffectivePin(user);
+  return enteredPin.trim() === expectedPin.trim();
+}
+
+export function verifyUserPassword(user: UserAccount, enteredPassword: string): boolean {
+  const expectedPassword = getUserEffectivePassword(user);
+  return (
+    enteredPassword.trim().toLowerCase() === expectedPassword.trim().toLowerCase() ||
+    enteredPassword.trim() === expectedPassword.trim()
+  );
+}
+

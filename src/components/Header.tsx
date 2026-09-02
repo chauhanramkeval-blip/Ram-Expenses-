@@ -43,6 +43,7 @@ interface HeaderProps {
   onOpenEditProfile?: () => void;
   onLogout?: () => void;
   onOpenNewAccountModal?: () => void;
+  onLockSession?: () => void;
   isFirebaseOnline?: boolean;
   isFirebaseSynced?: boolean;
 }
@@ -72,6 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenEditProfile = () => {},
   onLogout = () => {},
   onOpenNewAccountModal = () => {},
+  onLockSession,
   isFirebaseOnline = true,
   isFirebaseSynced = true,
 }) => {
@@ -242,6 +244,20 @@ export const Header: React.FC<HeaderProps> = ({
               <span>Add Spend</span>
             </button>
 
+            {/* Lock / Switch User Quick Button */}
+            {onLockSession && (
+              <button
+                id="btn-lock-switch-user-header"
+                type="button"
+                onClick={onLockSession}
+                title="Lock Session / Switch User Profile (Requires PIN/Password)"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] rounded-full transition-colors cursor-pointer border border-[#D2E3FC]"
+              >
+                <Lock size={14} />
+                <span className="hidden sm:inline">Lock / Switch</span>
+              </button>
+            )}
+
             {/* Logged in User Account & Logout Menu */}
             {currentUser && (
               <UserProfileMenu
@@ -254,6 +270,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onOpenFirebaseSync={onOpenFirebaseSync}
                 onLogout={onLogout}
                 onOpenNewAccountModal={onOpenNewAccountModal}
+                onLockSession={onLockSession}
               />
             )}
           </div>

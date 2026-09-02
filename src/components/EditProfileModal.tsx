@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, User, Mail, Phone, QrCode, Building2, Check, Palette } from "lucide-react";
+import { X, User, Mail, Phone, QrCode, Building2, Check, Palette, Lock, KeyRound } from "lucide-react";
 import { UserAccount } from "../types";
 
 interface EditProfileModalProps {
@@ -30,6 +30,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [email, setEmail] = useState(currentUser.email);
   const [phone, setPhone] = useState(currentUser.phone || "");
   const [upiId, setUpiId] = useState(currentUser.upiId || "");
+  const [pin, setPin] = useState(currentUser.pin || "1234");
+  const [password, setPassword] = useState(currentUser.password || "khata");
   const [accountType, setAccountType] = useState<"Personal" | "Business / Shop" | "Household & Family">(
     currentUser.accountType || "Personal"
   );
@@ -41,6 +43,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       setEmail(currentUser.email);
       setPhone(currentUser.phone || "");
       setUpiId(currentUser.upiId || "");
+      setPin(currentUser.pin || "1234");
+      setPassword(currentUser.password || "khata");
       setAccountType(currentUser.accountType || "Personal");
       setAvatarColor(currentUser.avatarColor || "#1A73E8");
     }
@@ -58,6 +62,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       email: email.trim(),
       phone: phone.trim(),
       upiId: upiId.trim(),
+      pin: pin.trim() || "1234",
+      password: password.trim() || "khata",
       accountType,
       avatarColor,
     };
@@ -196,6 +202,53 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-[#F8F9FA] focus:bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none"
               />
             </div>
+          </div>
+
+          {/* Security PIN & Password Setup */}
+          <div className="p-3 bg-[#F8F9FA] rounded-2xl border border-[#E8EAED] space-y-3">
+            <span className="text-xs font-bold text-[#202124] flex items-center gap-1.5">
+              <Lock size={14} className="text-[#1A73E8]" />
+              <span>Security PIN & Password</span>
+            </span>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="text-[11px] font-semibold text-[#5F6368] block mb-1">
+                  4-Digit PIN *
+                </label>
+                <div className="relative">
+                  <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#5F6368]" size={14} />
+                  <input
+                    type="password"
+                    maxLength={4}
+                    required
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="1234"
+                    className="w-full pl-8 pr-2 py-1.5 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none font-mono tracking-widest text-center"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-[#5F6368] block mb-1">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#5F6368]" size={14} />
+                  <input
+                    type="text"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="khata123"
+                    className="w-full pl-8 pr-2 py-1.5 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="text-[10px] text-[#80868B]">
+              This PIN will be requested when logging in or switching to your account.
+            </p>
           </div>
 
           {/* Account / Khata Type */}

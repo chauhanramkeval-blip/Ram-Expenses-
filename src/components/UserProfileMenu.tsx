@@ -26,6 +26,7 @@ interface UserProfileMenuProps {
   onOpenFirebaseSync?: () => void;
   onLogout: () => void;
   onOpenNewAccountModal: () => void;
+  onLockSession?: () => void;
 }
 
 export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
@@ -38,6 +39,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
   onOpenFirebaseSync,
   onLogout,
   onOpenNewAccountModal,
+  onLockSession,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -131,8 +133,9 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
           {/* Switch Accounts List */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between px-1">
-              <span className="text-[11px] font-bold text-[#5F6368] uppercase tracking-wider">
-                Switch Khata Account
+              <span className="text-[11px] font-bold text-[#5F6368] uppercase tracking-wider flex items-center gap-1">
+                <Lock size={11} className="text-[#1A73E8]" />
+                <span>Switch Profile (Secure PIN)</span>
               </span>
               <button
                 type="button"
@@ -157,11 +160,10 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
                     id={`btn-switch-user-${u.id}`}
                     type="button"
                     onClick={() => {
-                      if (!isActive) {
-                        onSwitchUser(u);
-                      }
+                      onSwitchUser(u);
                       setIsOpen(false);
                     }}
+                    title={isActive ? "Active Account" : `Switch to ${u.name} (Requires Authentication)`}
                     className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer ${
                       isActive
                         ? "bg-[#E8F0FE] text-[#1A73E8] font-bold border border-[#D2E3FC]"
@@ -176,15 +178,18 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
                         {getInitials(u.name)}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-xs font-semibold truncate">{u.name}</div>
+                        <div className="text-xs font-semibold truncate flex items-center gap-1">
+                          <span>{u.name}</span>
+                          {!isActive && <Lock size={10} className="text-[#80868B] shrink-0" />}
+                        </div>
                         <div className="text-[10px] text-[#5F6368] truncate">{u.email}</div>
                       </div>
                     </div>
                     {isActive ? (
                       <Check size={14} className="text-[#1A73E8] shrink-0" />
                     ) : (
-                      <span className="text-[10px] text-[#80868B] px-1.5 py-0.5 bg-[#F1F3F4] rounded-md shrink-0">
-                        {u.accountType?.split(" ")[0]}
+                      <span className="text-[9px] font-bold text-[#1A73E8] bg-[#E8F0FE] px-1.5 py-0.5 rounded-md shrink-0">
+                        Verify
                       </span>
                     )}
                   </button>
@@ -195,6 +200,21 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
 
           {/* Settings & Privacy Shortcuts */}
           <div className="space-y-1 pt-1 border-t border-[#F1F3F4]">
+            {onLockSession && (
+              <button
+                id="btn-lock-session-menu-item"
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  onLockSession();
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-bold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] rounded-xl transition-colors cursor-pointer border border-[#D2E3FC]"
+              >
+                <Lock size={15} className="text-[#1A73E8]" />
+                <span>Lock Active Session Now</span>
+              </button>
+            )}
+
             <button
               id="btn-edit-profile-menu-item"
               type="button"
@@ -205,7 +225,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
               className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-semibold text-[#202124] hover:bg-[#F1F3F4] rounded-xl transition-colors cursor-pointer"
             >
               <User size={15} className="text-[#1A73E8]" />
-              <span>Edit Khata Profile</span>
+              <span>Edit Profile & Credentials</span>
             </button>
 
             {onOpenFirebaseSync && (

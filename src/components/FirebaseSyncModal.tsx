@@ -19,7 +19,7 @@ import {
   Save,
   RotateCcw,
 } from "lucide-react";
-import { Expense, Income, UserBudget } from "../types";
+import { Expense, Income, UserBudget, UserAccount } from "../types";
 import {
   getActiveFirebaseConfig,
   saveCustomFirebaseConfig,
@@ -42,6 +42,7 @@ interface FirebaseSyncModalProps {
   expenses: Expense[];
   incomes: Income[];
   budget: UserBudget;
+  currentUser?: UserAccount;
   onSyncCompleted?: (newExpenses: Expense[], newIncomes: Income[]) => void;
 }
 
@@ -51,8 +52,10 @@ export const FirebaseSyncModal: React.FC<FirebaseSyncModalProps> = ({
   expenses,
   incomes,
   budget,
+  currentUser,
   onSyncCompleted,
 }) => {
+  const activeUserId = currentUser?.id || "user-ramkeval";
   const [activeTab, setActiveTab] = useState<"status" | "config">("status");
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -61,7 +64,7 @@ export const FirebaseSyncModal: React.FC<FirebaseSyncModalProps> = ({
     type: "",
     text: "",
   });
-  const [lastSyncTime, setLastSyncTime] = useState<string | null>(getStoredLastSyncTime);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(() => getStoredLastSyncTime(activeUserId));
 
   // Config editing state
   const [config, setConfig] = useState<FirebaseConfig>(getActiveFirebaseConfig);
@@ -84,8 +87,8 @@ export const FirebaseSyncModal: React.FC<FirebaseSyncModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setConfig(getActiveFirebaseConfig());
-      setLastSyncTime(getStoredLastSyncTime());
-      const { isValid, error } = getFirebaseInstances();
+      setLastSyncTime(getStoredLastSyncTime(activeUserId));
+      const { isValid } = getFirebaseInstances();
       if (!isOnline) {
         setSyncStatus("offline");
       } else if (!isValid) {
@@ -94,7 +97,7 @@ export const FirebaseSyncModal: React.FC<FirebaseSyncModalProps> = ({
         setSyncStatus("synced");
       }
     }
-  }, [isOpen, isOnline]);
+  }, [isOpen, isOnline, activeUserId]);
 
   if (!isOpen) return null;
 
@@ -103,17 +106,17 @@ export const FirebaseSyncModal: React.FC<FirebaseSyncModalProps> = ({
   // Handle Manual Push / Sync to Cloud
   const handleManualPushSync = async () => {
     setIsSyncing(true);
-    setStatusMessage({ type: "info", text: "Pushing expenses and incomes to Firestore..." });
+    setStatusMessage({ type: "info", text: `Pushing ${currentUser?.name || "User"}'s data to Firestore...` });
 
     try {
-      const res = await pushAllLocalDataToFirestore(expenses, incomes, budget);
+      const res = await pushAllLocalDataToFirestore(expenses, incomes, budget, activeUserId);
       if (res.success) {
         const time = new Date().toISOString();
         setLastSyncTime(time);
         setSyncStatus("synced");
         setStatusMessage({
           type: "success",
-          text: `Synced ${res.syncedExpenses} expenses and ${res.syncedIncomes} incomes to Firestore successfully!`,
+          text: `Synced ${res.syncedExpenses} expenses and ${res.syncedIncomes} incomes for ${currentUser?.name || "Account"} to Firestore successfully!`,
         });
       } else {
         setSyncStatus("error");
@@ -136,17 +139,17 @@ export const FirebaseSyncModal: React.FC<FirebaseSyncModalProps> = ({
   // Handle Pull from Cloud
   const handlePullFromCloud = async () => {
     setIsSyncing(true);
-    setStatusMessage({ type: "info", text: "Fetching cloud records from Firestore..." });
+    setStatusMessage({ type: "info", text: `Fetching cloud records for ${currentUser?.name || "User"}...` });
 
     try {
-      const res = await fetchAllFromFirestore();
+      const res = await fetchAllFromFirestore(activeUserId);
       if (res.success) {
         const time = new Date().toISOString();
         setLastSyncTime(time);
         setSyncStatus("synced");
         setStatusMessage({
           type: "success",
-          text: `Pulled ${res.expenses.length} expenses and ${res.incomes.length} incomes from Firestore.`,
+          text: `Pulled ${res.expenses.length} expenses and ${res.incomes.length} incomes for ${currentUser?.name || "Account"} from Firestore.`,
         });
         if (onSyncCompleted && (res.expenses.length > 0 || res.incomes.length > 0)) {
           onSyncCompleted(res.expenses, res.incomes);
@@ -317,9 +320,20 @@ export const FirebaseSyncModal: React.FC<FirebaseSyncModalProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-[#E8EAED]">
-                  <span className="text-xs font-semibold text-[#5F6368]">Collection Name</span>
-                  <span className="font-mono text-xs font-bold text-[#202124] bg-white px-2 py-0.5 rounded-lg border border-[#E8EAED]">
-                    expenses & incomes
+                  <span className="text-xs font-semibold text-[#5F6368]">Active Account</span>
+                  <span className="text-xs font-bold text-[#202124] flex items-center gap-1.5">
+                    <span
+                      className="w-2 h-2 rounded-full inline-block"
+                      style={{ backgroundColor: currentUser?.avatarColor || "#1A73E8" }}
+                    />
+                    <span>{currentUser?.name || "Personal Khata"}</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-[#E8EAED]">
+                  <span className="text-xs font-semibold text-[#5F6368]">Firestore Path</span>
+                  <span className="font-mono text-[11px] font-bold text-[#1A73E8] bg-white px-2 py-0.5 rounded-lg border border-[#E8EAED] truncate max-w-[220px]">
+                    users/{activeUserId}/...
                   </span>
                 </div>
 

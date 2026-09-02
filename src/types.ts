@@ -40,6 +40,7 @@ export type IncomeStreamType = "salary_bonus" | "extra_income";
 
 export interface Expense {
   id: string;
+  userId?: string;
   title: string;
   amount: number;
   category: ExpenseCategory;
@@ -49,10 +50,12 @@ export interface Expense {
   notes?: string;
   merchantOrLocation?: string;
   isRecurring?: boolean;
+  syncedAt?: string;
 }
 
 export interface Income {
   id: string;
+  userId?: string;
   title: string;
   amount: number;
   category: IncomeCategory;
@@ -63,6 +66,7 @@ export interface Income {
   notes?: string;
   sourceOrClient?: string;
   isRecurring?: boolean;
+  syncedAt?: string;
 }
 
 export interface CategoryMeta {
@@ -145,5 +149,9 @@ export interface UserAccount {
   joinedDate: string;
   lastLogin?: string;
   authProvider?: "google" | "email" | "phone" | "pin";
+  pin?: string; // 4-digit PIN for quick profile switch & lock (e.g. "1234")
+  password?: string; // Password (e.g. "khata123")
+  securityQuestion?: string;
+  securityAnswer?: string;
 }
 

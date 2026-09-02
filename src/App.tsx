@@ -12,6 +12,8 @@ import { BudgetSettingsModal } from "./components/BudgetSettingsModal";
 import { SecuritySettingsModal } from "./components/SecuritySettingsModal";
 import { EditProfileModal } from "./components/EditProfileModal";
 import { AddAccountModal } from "./components/AddAccountModal";
+import { ProfileLoginModal } from "./components/ProfileLoginModal";
+import { InitialAuthModal } from "./components/InitialAuthModal";
 import { AuthScreen } from "./components/AuthScreen";
 import { LockScreen } from "./components/LockScreen";
 import { ExportModal } from "./components/ExportModal";
@@ -48,14 +50,23 @@ import {
   setStoredCurrentUser,
   getStoredAuthState,
   setStoredAuthState,
+  isOnboardingCompleted,
+  setOnboardingCompleted,
 } from "./utils/auth";
-
-const LOCAL_STORAGE_EXPENSES_KEY = "khata_indian_expenses_v1";
-const LOCAL_STORAGE_INCOMES_KEY = "khata_indian_incomes_v1";
-const LOCAL_STORAGE_BUDGET_KEY = "khata_indian_budget_v1";
-const LOCAL_STORAGE_EXP_CATEGORIES_KEY = "khata_expense_categories_v2";
-const LOCAL_STORAGE_INC_CATEGORIES_KEY = "khata_income_categories_v2";
-const LOCAL_STORAGE_SECURITY_KEY = "khata_security_settings_v1";
+import {
+  loadUserExpenses,
+  saveUserExpenses,
+  loadUserIncomes,
+  saveUserIncomes,
+  loadUserBudget,
+  saveUserBudget,
+  loadUserCategories,
+  saveUserCategories,
+  loadUserIncCategories,
+  saveUserIncCategories,
+  loadUserSecurity,
+  saveUserSecurity,
+} from "./utils/userStorage";
 
 const DEFAULT_BUDGET: UserBudget = {
   monthlyBudget: 35000,
@@ -73,101 +84,49 @@ const DEFAULT_SECURITY: AppSecuritySettings = {
 };
 
 export default function App() {
-  // Expenses State
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_EXPENSES_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error("Failed to load saved expenses", e);
-    }
-    return INITIAL_EXPENSES;
-  });
-
-  // Incomes State
-  const [incomes, setIncomes] = useState<Income[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_INCOMES_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error("Failed to load saved incomes", e);
-    }
-    return INITIAL_INCOMES;
-  });
-
-  // Custom Expense Categories State
-  const [customExpenseCategories, setCustomExpenseCategories] = useState<CategoryMeta[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_EXP_CATEGORIES_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error("Failed to load custom expense categories", e);
-    }
-    return CATEGORY_LIST;
-  });
-
-  // Custom Income Categories State
-  const [customIncomeCategories, setCustomIncomeCategories] = useState<IncomeCategoryMeta[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_INC_CATEGORIES_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error("Failed to load custom income categories", e);
-    }
-    return INCOME_CATEGORY_LIST;
-  });
-
-  // Budget State
-  const [budget, setBudget] = useState<UserBudget>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_BUDGET_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error("Failed to load budget", e);
-    }
-    return DEFAULT_BUDGET;
-  });
-
-  // Privacy & Security App Lock State
-  const [securitySettings, setSecuritySettings] = useState<AppSecuritySettings>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_SECURITY_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error("Failed to load security settings", e);
-    }
-    return DEFAULT_SECURITY;
-  });
-
-  const [isLocked, setIsLocked] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_SECURITY_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.isEnabled === true;
-      }
-    } catch (e) {}
-    return false;
-  });
-
   // User Accounts & Authentication State
   const [users, setUsers] = useState<UserAccount[]>(getStoredUsers);
   const [currentUser, setCurrentUser] = useState<UserAccount>(getStoredCurrentUser);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(getStoredAuthState);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [pendingSwitchUser, setPendingSwitchUser] = useState<UserAccount | null>(null);
+  const [isProfileLoginModalOpen, setIsProfileLoginModalOpen] = useState(false);
+
+  // User-Isolated Expenses State
+  const [expenses, setExpenses] = useState<Expense[]>(() =>
+    loadUserExpenses(currentUser.id)
+  );
+
+  // User-Isolated Incomes State
+  const [incomes, setIncomes] = useState<Income[]>(() =>
+    loadUserIncomes(currentUser.id)
+  );
+
+  // User-Isolated Custom Expense Categories State
+  const [customExpenseCategories, setCustomExpenseCategories] = useState<CategoryMeta[]>(() =>
+    loadUserCategories(currentUser.id, CATEGORY_LIST)
+  );
+
+  // User-Isolated Custom Income Categories State
+  const [customIncomeCategories, setCustomIncomeCategories] = useState<IncomeCategoryMeta[]>(() =>
+    loadUserIncCategories(currentUser.id, INCOME_CATEGORY_LIST)
+  );
+
+  // User-Isolated Budget State
+  const [budget, setBudget] = useState<UserBudget>(() =>
+    loadUserBudget(currentUser.id, DEFAULT_BUDGET)
+  );
+
+  // User-Isolated Privacy & Security App Lock State
+  const [securitySettings, setSecuritySettings] = useState<AppSecuritySettings>(() =>
+    loadUserSecurity(currentUser.id, DEFAULT_SECURITY)
+  );
+
+  const [isLocked, setIsLocked] = useState<boolean>(() => {
+    const sec = loadUserSecurity(currentUser.id, DEFAULT_SECURITY);
+    return sec.isEnabled === true;
+  });
 
   // UI States
   const [activeTab, setActiveTab] = useState<"expenses" | "incomes" | "visuals" | "advisor">("expenses");
@@ -203,23 +162,33 @@ export default function App() {
     };
   }, []);
 
-  // Real-time Firestore live synchronization listener
+  // Real-time Firestore live synchronization listener for active user
   useEffect(() => {
-    const unsubExpenses = subscribeToExpensesCollection((remoteExpenses) => {
-      if (remoteExpenses && remoteExpenses.length > 0) {
+    if (!currentUser?.id) return;
+    const activeUserId = currentUser.id;
+
+    const unsubExpenses = subscribeToExpensesCollection(activeUserId, (remoteExpenses) => {
+      if (remoteExpenses) {
         setExpenses((prev) => {
+          // Check if remote data differs from local state
           const prevMap = new Map<string, Expense>(prev.map((e) => [e.id, e]));
           let hasDiff = false;
-          remoteExpenses.forEach((re) => {
-            const existing = prevMap.get(re.id);
-            if (!existing || JSON.stringify(existing) !== JSON.stringify(re)) {
-              prevMap.set(re.id, re);
-              hasDiff = true;
+          if (remoteExpenses.length !== prev.length) {
+            hasDiff = true;
+          } else {
+            for (const re of remoteExpenses) {
+              const existing = prevMap.get(re.id);
+              if (!existing || JSON.stringify(existing) !== JSON.stringify(re)) {
+                hasDiff = true;
+                break;
+              }
             }
-          });
+          }
+
           if (hasDiff) {
-            const merged = Array.from(prevMap.values());
+            const merged = [...remoteExpenses];
             merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            saveUserExpenses(activeUserId, merged);
             return merged;
           }
           return prev;
@@ -228,21 +197,27 @@ export default function App() {
       }
     });
 
-    const unsubIncomes = subscribeToIncomesCollection((remoteIncomes) => {
-      if (remoteIncomes && remoteIncomes.length > 0) {
+    const unsubIncomes = subscribeToIncomesCollection(activeUserId, (remoteIncomes) => {
+      if (remoteIncomes) {
         setIncomes((prev) => {
           const prevMap = new Map<string, Income>(prev.map((i) => [i.id, i]));
           let hasDiff = false;
-          remoteIncomes.forEach((ri) => {
-            const existing = prevMap.get(ri.id);
-            if (!existing || JSON.stringify(existing) !== JSON.stringify(ri)) {
-              prevMap.set(ri.id, ri);
-              hasDiff = true;
+          if (remoteIncomes.length !== prev.length) {
+            hasDiff = true;
+          } else {
+            for (const ri of remoteIncomes) {
+              const existing = prevMap.get(ri.id);
+              if (!existing || JSON.stringify(existing) !== JSON.stringify(ri)) {
+                hasDiff = true;
+                break;
+              }
             }
-          });
+          }
+
           if (hasDiff) {
-            const merged = Array.from(prevMap.values());
+            const merged = [...remoteIncomes];
             merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            saveUserIncomes(activeUserId, merged);
             return merged;
           }
           return prev;
@@ -255,7 +230,7 @@ export default function App() {
       if (unsubExpenses) unsubExpenses();
       if (unsubIncomes) unsubIncomes();
     };
-  }, []);
+  }, [currentUser.id]);
 
   // Sync users and authentication state
   useEffect(() => {
@@ -270,23 +245,66 @@ export default function App() {
     setStoredAuthState(isLoggedIn);
   }, [isLoggedIn]);
 
+  // Persist active user data changes to localStorage
+  useEffect(() => {
+    if (currentUser?.id) {
+      saveUserExpenses(currentUser.id, expenses);
+    }
+  }, [expenses, currentUser.id]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      saveUserIncomes(currentUser.id, incomes);
+    }
+  }, [incomes, currentUser.id]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      saveUserBudget(currentUser.id, budget);
+    }
+  }, [budget, currentUser.id]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      saveUserCategories(currentUser.id, customExpenseCategories);
+    }
+  }, [customExpenseCategories, currentUser.id]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      saveUserIncCategories(currentUser.id, customIncomeCategories);
+    }
+  }, [customIncomeCategories, currentUser.id]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      saveUserSecurity(currentUser.id, securitySettings);
+    }
+  }, [securitySettings, currentUser.id]);
+
   // Handle Backup Restoration
   const handleRestoreBackup = (backupData: KhataFullBackupData, mode: "replace" | "merge") => {
+    const activeUserId = currentUser.id;
     if (mode === "replace") {
       if (Array.isArray(backupData.expenses)) {
         setExpenses(backupData.expenses);
+        saveUserExpenses(activeUserId, backupData.expenses);
       }
       if (Array.isArray(backupData.incomes)) {
         setIncomes(backupData.incomes);
+        saveUserIncomes(activeUserId, backupData.incomes);
       }
       if (backupData.budget) {
         setBudget(backupData.budget);
+        saveUserBudget(activeUserId, backupData.budget);
       }
       if (Array.isArray(backupData.customExpenseCategories)) {
         setCustomExpenseCategories(backupData.customExpenseCategories);
+        saveUserCategories(activeUserId, backupData.customExpenseCategories);
       }
       if (Array.isArray(backupData.customIncomeCategories)) {
         setCustomIncomeCategories(backupData.customIncomeCategories);
+        saveUserIncCategories(activeUserId, backupData.customIncomeCategories);
       }
     } else {
       // Merge mode: Add records that don't exist by ID
@@ -294,38 +312,186 @@ export default function App() {
         setExpenses((prev) => {
           const existingIds = new Set(prev.map((e) => e.id));
           const newItems = backupData.expenses.filter((e) => !existingIds.has(e.id));
-          return [...prev, ...newItems];
+          const merged = [...prev, ...newItems];
+          saveUserExpenses(activeUserId, merged);
+          return merged;
         });
       }
       if (Array.isArray(backupData.incomes)) {
         setIncomes((prev) => {
           const existingIds = new Set(prev.map((i) => i.id));
           const newItems = backupData.incomes.filter((i) => !existingIds.has(i.id));
-          return [...prev, ...newItems];
+          const merged = [...prev, ...newItems];
+          saveUserIncomes(activeUserId, merged);
+          return merged;
         });
       }
     }
   };
 
   // Auth & Profile Handlers
-  const handleLogin = (user: UserAccount) => {
-    setCurrentUser(user);
+  const handleSignUp = (newUser: UserAccount) => {
+    // 1. Initialize empty data slate (₹0 balance, 0 expenses) for the new user
+    saveUserExpenses(newUser.id, []);
+    saveUserIncomes(newUser.id, []);
+    saveUserBudget(newUser.id, DEFAULT_BUDGET);
+    saveUserCategories(newUser.id, CATEGORY_LIST);
+    saveUserIncCategories(newUser.id, INCOME_CATEGORY_LIST);
+
+    const initialSecurity: AppSecuritySettings = {
+      isEnabled: true,
+      pinCode: newUser.pin || "1234",
+      isBiometricEnabled: false,
+      autoLockMinutes: 0,
+    };
+    saveUserSecurity(newUser.id, initialSecurity);
+
+    // 2. Set as primary user in stored users
+    setUsers((prev) => {
+      const filtered = prev.filter(
+        (u) => u.id !== newUser.id && u.email.toLowerCase() !== newUser.email.toLowerCase()
+      );
+      const updated = [newUser, ...filtered];
+      saveStoredUsers(updated);
+      return updated;
+    });
+
+    // 3. Set active user & fresh slate state
+    setCurrentUser(newUser);
+    setExpenses([]);
+    setIncomes([]);
+    setBudget(DEFAULT_BUDGET);
+    setCustomExpenseCategories(CATEGORY_LIST);
+    setCustomIncomeCategories(INCOME_CATEGORY_LIST);
+    setSecuritySettings(initialSecurity);
     setIsLoggedIn(true);
-    // If user has security enabled, prompt app lock if enabled
-    if (securitySettings.isEnabled) {
-      setIsLocked(false);
-    }
+    setIsLocked(false);
+    setEditingExpense(null);
+    setEditingIncome(null);
+    setSearchQuery("");
+
+    // 4. Persist state
+    setOnboardingCompleted(true);
+    setStoredAuthState(true);
+    setStoredCurrentUser(newUser);
+  };
+
+  const handleLogin = (user: UserAccount) => {
+    const userExpenses = loadUserExpenses(user.id);
+    const userIncomes = loadUserIncomes(user.id);
+    const userBudget = loadUserBudget(user.id, DEFAULT_BUDGET);
+    const userExpCats = loadUserCategories(user.id, CATEGORY_LIST);
+    const userIncCats = loadUserIncCategories(user.id, INCOME_CATEGORY_LIST);
+    const userSecurity = loadUserSecurity(user.id, DEFAULT_SECURITY);
+
+    setCurrentUser(user);
+    setExpenses(userExpenses);
+    setIncomes(userIncomes);
+    setBudget(userBudget);
+    setCustomExpenseCategories(userExpCats);
+    setCustomIncomeCategories(userIncCats);
+    setSecuritySettings(userSecurity);
+    setIsLoggedIn(true);
+    setIsLocked(false);
+    setEditingExpense(null);
+    setEditingIncome(null);
+    setSearchQuery("");
+
+    setOnboardingCompleted(true);
+    setStoredAuthState(true);
+    setStoredCurrentUser(user);
   };
 
   const handleLogout = () => {
+    saveUserExpenses(currentUser.id, expenses);
+    saveUserIncomes(currentUser.id, incomes);
+    saveUserBudget(currentUser.id, budget);
+    saveUserCategories(currentUser.id, customExpenseCategories);
+    saveUserIncCategories(currentUser.id, customIncomeCategories);
+    saveUserSecurity(currentUser.id, securitySettings);
+
     setIsLoggedIn(false);
+    setStoredAuthState(false);
   };
 
-  const handleSwitchUser = (user: UserAccount) => {
-    setCurrentUser(user);
+  /**
+   * User Switch Initiator:
+   * 1. Immediately saves active user data
+   * 2. Opens the Profile Authentication / Login Modal to securely verify PIN/Password/Biometric
+   * 3. Prevents displaying the target profile's private finances until verified
+   */
+  const handleSwitchUser = (selectedUser: UserAccount) => {
+    // 1. Immediately persist active user's data
+    saveUserExpenses(currentUser.id, expenses);
+    saveUserIncomes(currentUser.id, incomes);
+    saveUserBudget(currentUser.id, budget);
+    saveUserCategories(currentUser.id, customExpenseCategories);
+    saveUserIncCategories(currentUser.id, customIncomeCategories);
+    saveUserSecurity(currentUser.id, securitySettings);
+
+    // 2. Open Profile Login Modal
+    setPendingSwitchUser(selectedUser);
+    setIsProfileLoginModalOpen(true);
+  };
+
+  /**
+   * Lock Session:
+   * Prompts authentication for the current active account
+   */
+  const handleLockSession = () => {
+    saveUserExpenses(currentUser.id, expenses);
+    saveUserIncomes(currentUser.id, incomes);
+    saveUserBudget(currentUser.id, budget);
+    saveUserCategories(currentUser.id, customExpenseCategories);
+    saveUserIncCategories(currentUser.id, customIncomeCategories);
+    saveUserSecurity(currentUser.id, securitySettings);
+
+    setPendingSwitchUser(currentUser);
+    setIsProfileLoginModalOpen(true);
+  };
+
+  /**
+   * Executed when authentication succeeds in ProfileLoginModal:
+   * Switches to authenticated user and loads their isolated ledger data
+   */
+  const handleAuthenticatedSwitch = (authenticatedUser: UserAccount) => {
+    const newExpenses = loadUserExpenses(authenticatedUser.id);
+    const newIncomes = loadUserIncomes(authenticatedUser.id);
+    const newBudget = loadUserBudget(authenticatedUser.id, DEFAULT_BUDGET);
+    const newExpCats = loadUserCategories(authenticatedUser.id, CATEGORY_LIST);
+    const newIncCats = loadUserIncCategories(authenticatedUser.id, INCOME_CATEGORY_LIST);
+    const newSecurity = loadUserSecurity(authenticatedUser.id, DEFAULT_SECURITY);
+
+    setCurrentUser(authenticatedUser);
+    setExpenses(newExpenses);
+    setIncomes(newIncomes);
+    setBudget(newBudget);
+    setCustomExpenseCategories(newExpCats);
+    setCustomIncomeCategories(newIncCats);
+    setSecuritySettings(newSecurity);
+
+    setEditingExpense(null);
+    setEditingIncome(null);
+    setSearchQuery("");
+    setIsLocked(false);
+    setPendingSwitchUser(null);
+    setIsProfileLoginModalOpen(false);
+
+    // Update users array with lastLogin timestamp
+    setUsers((prev) =>
+      prev.map((u) => (u.id === authenticatedUser.id ? { ...u, lastLogin: "Just now" } : u))
+    );
   };
 
   const handleRegisterUser = (newUser: UserAccount) => {
+    // Seed new user storage with empty slate
+    saveUserExpenses(newUser.id, []);
+    saveUserIncomes(newUser.id, []);
+    saveUserBudget(newUser.id, DEFAULT_BUDGET);
+    saveUserCategories(newUser.id, CATEGORY_LIST);
+    saveUserIncCategories(newUser.id, INCOME_CATEGORY_LIST);
+    saveUserSecurity(newUser.id, DEFAULT_SECURITY);
+
     setUsers((prev) => {
       const idx = prev.findIndex((u) => u.id === newUser.id || u.email.toLowerCase() === newUser.email.toLowerCase());
       if (idx >= 0) {
@@ -343,8 +509,35 @@ export default function App() {
   };
 
   const handleAddAccount = (newAcc: UserAccount) => {
+    // 1. Save current active user data
+    saveUserExpenses(currentUser.id, expenses);
+    saveUserIncomes(currentUser.id, incomes);
+    saveUserBudget(currentUser.id, budget);
+    saveUserCategories(currentUser.id, customExpenseCategories);
+    saveUserIncCategories(currentUser.id, customIncomeCategories);
+    saveUserSecurity(currentUser.id, securitySettings);
+
+    // 2. Initialize clean slate for new user account
+    saveUserExpenses(newAcc.id, []);
+    saveUserIncomes(newAcc.id, []);
+    saveUserBudget(newAcc.id, DEFAULT_BUDGET);
+    saveUserCategories(newAcc.id, CATEGORY_LIST);
+    saveUserIncCategories(newAcc.id, INCOME_CATEGORY_LIST);
+    saveUserSecurity(newAcc.id, DEFAULT_SECURITY);
+
+    // 3. Switch active user to new account with clean slate
     setUsers((prev) => [...prev, newAcc]);
     setCurrentUser(newAcc);
+    setExpenses([]);
+    setIncomes([]);
+    setBudget(DEFAULT_BUDGET);
+    setCustomExpenseCategories(CATEGORY_LIST);
+    setCustomIncomeCategories(INCOME_CATEGORY_LIST);
+    setSecuritySettings(DEFAULT_SECURITY);
+    setIsLocked(false);
+    setEditingExpense(null);
+    setEditingIncome(null);
+    setSearchQuery("");
   };
 
   // Auto-lock when tab is backgrounded / hidden based on autoLockMinutes setting
@@ -361,7 +554,7 @@ export default function App() {
         }
       } else {
         if (backgroundTime !== null && securitySettings.autoLockMinutes > 0) {
-          const elapsedMinutes = (Date.now() - backgroundTime) / 60000;
+          const elapsedMinutes = (Date.now() - backgroundTime) / (1000 * 60);
           if (elapsedMinutes >= securitySettings.autoLockMinutes) {
             setIsLocked(true);
           }
@@ -376,71 +569,10 @@ export default function App() {
     };
   }, [securitySettings]);
 
-  // Capture PWA beforeinstallprompt event for Android 1-click install
-  useEffect(() => {
-    const handleBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
-    };
-  }, []);
-
-  // Sync to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_EXPENSES_KEY, JSON.stringify(expenses));
-    } catch (e) {
-      console.error("Failed to save expenses", e);
-    }
-  }, [expenses]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_INCOMES_KEY, JSON.stringify(incomes));
-    } catch (e) {
-      console.error("Failed to save incomes", e);
-    }
-  }, [incomes]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_EXP_CATEGORIES_KEY, JSON.stringify(customExpenseCategories));
-    } catch (e) {
-      console.error("Failed to save custom expense categories", e);
-    }
-  }, [customExpenseCategories]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_INC_CATEGORIES_KEY, JSON.stringify(customIncomeCategories));
-    } catch (e) {
-      console.error("Failed to save custom income categories", e);
-    }
-  }, [customIncomeCategories]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_BUDGET_KEY, JSON.stringify(budget));
-    } catch (e) {
-      console.error("Failed to save budget", e);
-    }
-  }, [budget]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_SECURITY_KEY, JSON.stringify(securitySettings));
-    } catch (e) {
-      console.error("Failed to save security settings", e);
-    }
-  }, [securitySettings]);
-
   // Security Lock Handlers
   const handleSaveSecuritySettings = (newSettings: AppSecuritySettings) => {
     setSecuritySettings(newSettings);
+    saveUserSecurity(currentUser.id, newSettings);
     if (!newSettings.isEnabled) {
       setIsLocked(false);
     }
@@ -460,10 +592,24 @@ export default function App() {
       autoLockMinutes: 0,
     };
     setSecuritySettings(disabled);
+    saveUserSecurity(currentUser.id, disabled);
     setIsLocked(false);
   };
 
-  // Current month calculations
+  // PWA BeforeInstallPrompt Event Listener
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
+  }, []);
+
+  // Filter expenses and incomes for current month totals
   const now = new Date();
   const currentMonthExpenses = expenses.filter((e) => {
     const d = new Date(e.date);
@@ -490,22 +636,29 @@ export default function App() {
   ) => {
     let savedExpense: Expense;
     if (editId) {
-      savedExpense = { ...expenseData, id: editId };
-      setExpenses((prev) =>
-        prev.map((e) => (e.id === editId ? savedExpense : e))
-      );
+      savedExpense = { ...expenseData, id: editId, userId: currentUser.id };
+      setExpenses((prev) => {
+        const next = prev.map((e) => (e.id === editId ? savedExpense : e));
+        saveUserExpenses(currentUser.id, next);
+        return next;
+      });
     } else {
       savedExpense = {
         ...expenseData,
         id: `exp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        userId: currentUser.id,
       };
-      setExpenses((prev) => [savedExpense, ...prev]);
+      setExpenses((prev) => {
+        const next = [savedExpense, ...prev];
+        saveUserExpenses(currentUser.id, next);
+        return next;
+      });
     }
     setEditingExpense(null);
 
-    // Instant Real-time Cloud Sync
+    // Instant Real-time Cloud Sync for active user
     setIsFirebaseSynced(false);
-    syncExpenseToFirestore(savedExpense)
+    syncExpenseToFirestore(savedExpense, currentUser.id)
       .then((success) => {
         if (success) setIsFirebaseSynced(true);
       })
@@ -513,9 +666,13 @@ export default function App() {
   };
 
   const handleDeleteExpense = (id: string) => {
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
+    setExpenses((prev) => {
+      const next = prev.filter((e) => e.id !== id);
+      saveUserExpenses(currentUser.id, next);
+      return next;
+    });
     setIsFirebaseSynced(false);
-    deleteExpenseFromFirestore(id)
+    deleteExpenseFromFirestore(id, currentUser.id)
       .then((success) => {
         if (success) setIsFirebaseSynced(true);
       })
@@ -534,22 +691,29 @@ export default function App() {
   ) => {
     let savedIncome: Income;
     if (editId) {
-      savedIncome = { ...incomeData, id: editId };
-      setIncomes((prev) =>
-        prev.map((inc) => (inc.id === editId ? savedIncome : inc))
-      );
+      savedIncome = { ...incomeData, id: editId, userId: currentUser.id };
+      setIncomes((prev) => {
+        const next = prev.map((inc) => (inc.id === editId ? savedIncome : inc));
+        saveUserIncomes(currentUser.id, next);
+        return next;
+      });
     } else {
       savedIncome = {
         ...incomeData,
         id: `inc-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        userId: currentUser.id,
       };
-      setIncomes((prev) => [savedIncome, ...prev]);
+      setIncomes((prev) => {
+        const next = [savedIncome, ...prev];
+        saveUserIncomes(currentUser.id, next);
+        return next;
+      });
     }
     setEditingIncome(null);
 
-    // Instant Real-time Cloud Sync
+    // Instant Real-time Cloud Sync for active user
     setIsFirebaseSynced(false);
-    syncIncomeToFirestore(savedIncome)
+    syncIncomeToFirestore(savedIncome, currentUser.id)
       .then((success) => {
         if (success) setIsFirebaseSynced(true);
       })
@@ -557,9 +721,13 @@ export default function App() {
   };
 
   const handleDeleteIncome = (id: string) => {
-    setIncomes((prev) => prev.filter((inc) => inc.id !== id));
+    setIncomes((prev) => {
+      const next = prev.filter((inc) => inc.id !== id);
+      saveUserIncomes(currentUser.id, next);
+      return next;
+    });
     setIsFirebaseSynced(false);
-    deleteIncomeFromFirestore(id)
+    deleteIncomeFromFirestore(id, currentUser.id)
       .then((success) => {
         if (success) setIsFirebaseSynced(true);
       })
@@ -573,20 +741,30 @@ export default function App() {
 
   const handleSaveBudget = (newBudget: UserBudget) => {
     setBudget(newBudget);
-    syncBudgetToFirestore(newBudget).catch(() => {});
+    saveUserBudget(currentUser.id, newBudget);
+    syncBudgetToFirestore(newBudget, currentUser.id).catch(() => {});
   };
 
   const handleResetData = () => {
-    setExpenses(INITIAL_EXPENSES);
-    setIncomes(INITIAL_INCOMES);
+    const defaultExp = currentUser.id === "user-ramkeval" ? INITIAL_EXPENSES : [];
+    const defaultInc = currentUser.id === "user-ramkeval" ? INITIAL_INCOMES : [];
+    setExpenses(defaultExp);
+    setIncomes(defaultInc);
     setBudget(DEFAULT_BUDGET);
     setCustomExpenseCategories(CATEGORY_LIST);
     setCustomIncomeCategories(INCOME_CATEGORY_LIST);
+    saveUserExpenses(currentUser.id, defaultExp);
+    saveUserIncomes(currentUser.id, defaultInc);
+    saveUserBudget(currentUser.id, DEFAULT_BUDGET);
+    saveUserCategories(currentUser.id, CATEGORY_LIST);
+    saveUserIncCategories(currentUser.id, INCOME_CATEGORY_LIST);
   };
 
   const handleResetDefaultCategories = () => {
     setCustomExpenseCategories(CATEGORY_LIST);
     setCustomIncomeCategories(INCOME_CATEGORY_LIST);
+    saveUserCategories(currentUser.id, CATEGORY_LIST);
+    saveUserIncCategories(currentUser.id, INCOME_CATEGORY_LIST);
   };
 
   const handleTriggerInstall = async () => {
@@ -598,20 +776,13 @@ export default function App() {
     }
   };
 
-  // If logged out, render the modern Login & Registration Portal
-  if (!isLoggedIn) {
-    return (
-      <AuthScreen
-        allUsers={users}
-        currentUser={currentUser}
-        onLogin={handleLogin}
-        onRegisterUser={handleRegisterUser}
-      />
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#202124] flex flex-col font-sans">
+    <>
+      <div
+        className={`min-h-screen bg-[#F8F9FA] text-[#202124] flex flex-col font-sans transition-all duration-300 ${
+          !isLoggedIn ? "pointer-events-none select-none filter blur-[3px] opacity-60" : ""
+        }`}
+      >
       {/* Google Files style sticky Header */}
       <Header
         searchQuery={searchQuery}
@@ -644,6 +815,7 @@ export default function App() {
         onOpenEditProfile={() => setIsEditProfileOpen(true)}
         onLogout={handleLogout}
         onOpenNewAccountModal={() => setIsAddAccountOpen(true)}
+        onLockSession={handleLockSession}
         isFirebaseOnline={isOnline}
         isFirebaseSynced={isFirebaseSynced}
       />
@@ -766,8 +938,14 @@ export default function App() {
         onClose={() => setIsCategoryModalOpen(false)}
         expenseCategories={customExpenseCategories}
         incomeCategories={customIncomeCategories}
-        onSaveExpenseCategories={setCustomExpenseCategories}
-        onSaveIncomeCategories={setCustomIncomeCategories}
+        onSaveExpenseCategories={(cats) => {
+          setCustomExpenseCategories(cats);
+          saveUserCategories(currentUser.id, cats);
+        }}
+        onSaveIncomeCategories={(cats) => {
+          setCustomIncomeCategories(cats);
+          saveUserIncCategories(currentUser.id, cats);
+        }}
         onResetDefaultCategories={handleResetDefaultCategories}
         initialTab={categoryModalTab}
       />
@@ -824,9 +1002,12 @@ export default function App() {
         expenses={expenses}
         incomes={incomes}
         budget={budget}
+        currentUser={currentUser}
         onSyncCompleted={(newExpenses, newIncomes) => {
           setExpenses(newExpenses);
           setIncomes(newIncomes);
+          saveUserExpenses(currentUser.id, newExpenses);
+          saveUserIncomes(currentUser.id, newIncomes);
           setIsFirebaseSynced(true);
         }}
       />
@@ -855,6 +1036,17 @@ export default function App() {
         onAddAccount={handleAddAccount}
       />
 
+      {/* Secure Profile Authentication / Login & Switch Modal */}
+      <ProfileLoginModal
+        isOpen={isProfileLoginModalOpen}
+        targetUser={pendingSwitchUser || currentUser}
+        onClose={() => {
+          setIsProfileLoginModalOpen(false);
+          setPendingSwitchUser(null);
+        }}
+        onAuthenticated={handleAuthenticatedSwitch}
+      />
+
       {/* Full-Screen PIN & Biometric Lock Overlay */}
       {securitySettings.isEnabled && isLocked && (
         <LockScreen
@@ -863,6 +1055,17 @@ export default function App() {
           onResetSecurity={handleResetSecurity}
         />
       )}
-    </div>
+      </div>
+
+      {/* Initial First-Launch & Logged Out Sign Up / Login Modal Popup */}
+      <InitialAuthModal
+        isOpen={!isLoggedIn}
+        allUsers={users}
+        currentUser={currentUser}
+        onSignUp={handleSignUp}
+        onLogin={handleLogin}
+        initialMode={isOnboardingCompleted() ? "login" : "signup"}
+      />
+    </>
   );
 }
