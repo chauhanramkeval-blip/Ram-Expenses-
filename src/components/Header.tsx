@@ -42,6 +42,7 @@ interface HeaderProps {
   onSwitchUser?: (user: UserAccount) => void;
   onOpenEditProfile?: () => void;
   onLogout?: () => void;
+  onDeleteAccount?: (user: UserAccount) => void;
   onOpenNewAccountModal?: () => void;
   onLockSession?: () => void;
   isFirebaseOnline?: boolean;
@@ -72,6 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSwitchUser = () => {},
   onOpenEditProfile = () => {},
   onLogout = () => {},
+  onDeleteAccount,
   onOpenNewAccountModal = () => {},
   onLockSession,
   isFirebaseOnline = true,
@@ -140,15 +142,15 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={onOpenFirebaseSync}
                 title={
                   !isFirebaseOnline
-                    ? "Offline Mode - Click to view sync status"
+                    ? "Offline Mode - Click to view Cloud Backup"
                     : isFirebaseSynced
-                    ? "Cloud Firestore Synced - Click to manage"
-                    : "Syncing changes to Firestore..."
+                    ? "Cloud Active & Synced - Click to view Cloud Backup"
+                    : "Backing up changes to Cloud..."
                 }
                 className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] rounded-full transition-colors cursor-pointer border border-[#D2E3FC] relative"
               >
                 <Cloud size={14} />
-                <span className="hidden md:inline">Cloud Sync</span>
+                <span className="hidden md:inline">Cloud Backup</span>
                 <span
                   className={`w-2 h-2 rounded-full ${
                     !isFirebaseOnline
@@ -237,6 +239,7 @@ export const Header: React.FC<HeaderProps> = ({
               onOpenBackupModal={onOpenBackupModal}
               onOpenFirebaseSync={onOpenFirebaseSync}
               onLogout={onLogout}
+              onDeleteAccount={onDeleteAccount}
               onOpenNewAccountModal={onOpenNewAccountModal}
               onLockSession={onLockSession}
             />

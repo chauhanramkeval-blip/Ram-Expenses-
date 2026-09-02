@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, User, Mail, Phone, QrCode, Building2, Check, Palette, Lock, KeyRound } from "lucide-react";
+import { X, User, Mail, Phone, QrCode, Building2, Check, Palette, Lock, KeyRound, Eye, EyeOff } from "lucide-react";
 import { UserAccount } from "../types";
 import { ErrorBoundary } from "./ErrorBoundary";
 
@@ -42,6 +42,7 @@ const EditProfileModalContent: React.FC<EditProfileModalProps> = ({
   const [phone, setPhone] = useState(currentUser?.phone || "");
   const [upiId, setUpiId] = useState(currentUser?.upiId || "");
   const [pin, setPin] = useState(currentUser?.pin || "1234");
+  const [showPin, setShowPin] = useState(false);
   const [password, setPassword] = useState(currentUser?.password || "khata");
   const [accountType, setAccountType] = useState<"Personal" | "Business / Shop" | "Household & Family">(
     currentUser?.accountType || "Personal"
@@ -237,14 +238,24 @@ const EditProfileModalContent: React.FC<EditProfileModalProps> = ({
                 <div className="relative">
                   <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#5F6368]" size={14} />
                   <input
-                    type="password"
+                    type={showPin ? "text" : "password"}
                     maxLength={4}
+                    inputMode="numeric"
                     required
                     value={pin}
                     onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     placeholder="1234"
-                    className="w-full pl-8 pr-2 py-1.5 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none font-mono tracking-widest text-center"
+                    className="w-full pl-8 pr-7 py-1.5 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none font-mono tracking-widest text-center"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[#5F6368] hover:text-[#1A73E8] cursor-pointer"
+                    title={showPin ? "Hide PIN" : "Show PIN"}
+                    aria-label={showPin ? "Hide PIN" : "Show PIN"}
+                  >
+                    {showPin ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
                 </div>
               </div>
 

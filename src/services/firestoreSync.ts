@@ -373,3 +373,36 @@ export const fetchAllFromFirestore = async (
     };
   }
 };
+
+/**
+ * Permanently deletes all expenses and incomes stored on Firestore for a given user.
+ */
+export const deleteUserFirestoreData = async (userId: string): Promise<boolean> => {
+  const db = getFirestoreDb();
+  if (!db || !isFirebaseConfigValid() || !userId) {
+    return false;
+  }
+
+  try {
+    const batch = writeBatch(db);
+
+    const expSnap = await getDocs(collection(db, "users", userId, "expenses"));
+    expSnap.forEach((d) => {
+      batch.delete(d.ref);
+    });
+
+    const incSnap = await getDocs(collection(db, "users", userId, "incomes"));
+    incSnap.forEach((d) => {
+      batch.delete(d.ref);
+    });
+
+    const budgetRef = doc(db, "users", userId, "settings", "budget");
+    batch.delete(budgetRef);
+
+    await batch.commit();
+    return true;
+  } catch (err) {
+    console.error(`Failed to delete Firestore data for user ${userId}:`, err);
+    return false;
+  }
+};

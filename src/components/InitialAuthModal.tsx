@@ -59,6 +59,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
   const [phone, setPhone] = useState("+91 98765 43210");
   const [upiId, setUpiId] = useState("ramkeval@okhdfcbank");
   const [pin, setPin] = useState("1234");
+  const [showSignupPin, setShowSignupPin] = useState(false);
   const [password, setPassword] = useState("khata123");
 
   // Log In Form State
@@ -67,6 +68,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
   );
   const [loginMethod, setLoginMethod] = useState<"pin" | "password" | "google">("pin");
   const [loginPin, setLoginPin] = useState("");
+  const [showLoginPin, setShowLoginPin] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
@@ -484,17 +486,29 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                 </span>
               </div>
 
-              <div className="flex items-center gap-3">
-                <input
-                  id="signup-pin"
-                  type="password"
-                  maxLength={4}
-                  required
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                  placeholder="••••"
-                  className="w-32 py-2 px-3 text-center text-base font-bold bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none tracking-widest font-mono shadow-xs"
-                />
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <input
+                    id="signup-pin"
+                    type={showSignupPin ? "text" : "password"}
+                    maxLength={4}
+                    inputMode="numeric"
+                    required
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="••••"
+                    className="w-32 py-2 pl-3 pr-8 text-center text-base font-bold bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none tracking-widest font-mono shadow-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSignupPin(!showSignupPin)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5F6368] hover:text-[#1A73E8] cursor-pointer"
+                    title={showSignupPin ? "Hide PIN" : "Show PIN"}
+                    aria-label={showSignupPin ? "Hide PIN" : "Show PIN"}
+                  >
+                    {showSignupPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setPin("1234")}
@@ -575,9 +589,17 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                           <div className="text-[10px] text-[#5F6368] truncate">{u.email}</div>
                         </div>
                       </div>
-                      <span className="text-[10px] text-[#1A73E8] bg-white px-2 py-0.5 rounded-full border border-[#D2E3FC] shrink-0 font-mono">
-                        PIN: {getUserEffectivePin(u)}
-                      </span>
+                      {isSelected ? (
+                        <span className="text-[10px] font-bold text-[#1A73E8] bg-white px-2.5 py-0.5 rounded-full border border-[#D2E3FC] shrink-0 flex items-center gap-1 shadow-2xs">
+                          <KeyRound size={11} className="text-[#1A73E8]" />
+                          <span>Selected</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium text-[#5F6368] bg-white px-2 py-0.5 rounded-full border border-[#E8EAED] shrink-0 flex items-center gap-1">
+                          <Lock size={10} className="text-[#80868B]" />
+                          <span>Locked</span>
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -627,25 +649,50 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
             {/* TAB 1: 4-Digit PIN Pad */}
             {loginMethod === "pin" && (
               <div className="space-y-3">
-                {/* Masked PIN Bullets */}
-                <div
-                  className={`flex items-center justify-center gap-3 py-2 ${
-                    isShaking ? "animate-shake" : ""
-                  }`}
-                >
-                  {[0, 1, 2, 3].map((idx) => {
-                    const isFilled = loginPin.length > idx;
-                    return (
-                      <div
-                        key={idx}
-                        className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${
-                          isFilled
-                            ? "bg-[#1A73E8] scale-125 shadow-xs"
-                            : "bg-[#E8EAED] border border-[#DADCE0]"
-                        }`}
-                      />
-                    );
-                  })}
+                {/* Masked PIN Bullets & Eye Toggle */}
+                <div className="flex items-center justify-center gap-2 py-1">
+                  <div
+                    className={`flex items-center justify-center gap-2.5 py-1.5 px-3 bg-[#F8F9FA] rounded-2xl border border-[#E8EAED] shadow-2xs ${
+                      isShaking ? "animate-shake border-[#EA4335]" : ""
+                    }`}
+                  >
+                    {[0, 1, 2, 3].map((idx) => {
+                      const isFilled = loginPin.length > idx;
+                      const digit = loginPin[idx];
+                      return (
+                        <div
+                          key={idx}
+                          className={`w-7 h-8.5 rounded-xl flex items-center justify-center text-sm font-mono font-bold transition-all duration-200 border ${
+                            isFilled
+                              ? "bg-white border-[#1A73E8] text-[#1A73E8] shadow-xs scale-105"
+                              : "bg-white/60 border-[#DADCE0] text-transparent"
+                          }`}
+                        >
+                          {isFilled ? (
+                            showLoginPin ? (
+                              <span>{digit}</span>
+                            ) : (
+                              <span className="w-2 h-2 rounded-full bg-[#1A73E8] inline-block"></span>
+                            )
+                          ) : (
+                            <span className="text-[#DADCE0] text-xs font-normal">−</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Eye Toggle Button */}
+                  <button
+                    id="btn-toggle-initial-pin-visibility"
+                    type="button"
+                    onClick={() => setShowLoginPin(!showLoginPin)}
+                    className="p-2 text-[#5F6368] hover:text-[#1A73E8] hover:bg-[#F1F3F4] rounded-xl transition-colors cursor-pointer border border-[#E8EAED] bg-white shadow-2xs"
+                    title={showLoginPin ? "Hide PIN digits" : "Show PIN digits"}
+                    aria-label={showLoginPin ? "Hide PIN digits" : "Show PIN digits"}
+                  >
+                    {showLoginPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
 
                 {/* Interactive Keypad */}
@@ -698,7 +745,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                     className="text-[11px] font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-3 py-1 rounded-full border border-[#D2E3FC] transition-colors cursor-pointer inline-flex items-center gap-1"
                   >
                     <Sparkles size={12} />
-                    <span>Auto-Fill PIN ({targetPin})</span>
+                    <span>Auto-Fill (••••)</span>
                   </button>
                 </div>
               </div>

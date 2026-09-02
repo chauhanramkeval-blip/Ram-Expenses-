@@ -30,6 +30,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   onResetSecurity,
 }) => {
   const [pin, setPin] = useState<string>("");
+  const [showPin, setShowPin] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [isShaking, setIsShaking] = useState<boolean>(false);
   const [isAuthenticatingBio, setIsAuthenticatingBio] = useState<boolean>(false);
@@ -212,25 +213,49 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             : "Enter 4-digit PIN or use Biometric Fingerprint to view transactions"}
         </p>
 
-        {/* 4 PIN Dots */}
-        <div
-          className={`flex items-center justify-center gap-4 my-6 py-2 px-6 rounded-2xl bg-[#1A1D24] border border-[#2B303C] transition-transform ${
-            isShaking ? "animate-shake border-[#EF4444]" : ""
-          }`}
-        >
-          {[0, 1, 2, 3].map((index) => {
-            const isFilled = pin.length > index;
-            return (
-              <div
-                key={index}
-                className={`w-4 h-4 rounded-full transition-all duration-200 ${
-                  isFilled
-                    ? "bg-[#388BFD] scale-125 shadow-md shadow-[#388BFD]/50 ring-2 ring-[#388BFD]/30"
-                    : "bg-[#333846] border border-[#444A5B]"
-                }`}
-              />
-            );
-          })}
+        {/* 4 PIN Dots & Eye Toggle */}
+        <div className="flex items-center justify-center gap-2.5 my-5">
+          <div
+            className={`flex items-center justify-center gap-2.5 py-1.5 px-4 rounded-2xl bg-[#1A1D24] border border-[#2B303C] transition-transform ${
+              isShaking ? "animate-shake border-[#EF4444]" : ""
+            }`}
+          >
+            {[0, 1, 2, 3].map((index) => {
+              const isFilled = pin.length > index;
+              const digit = pin[index];
+              return (
+                <div
+                  key={index}
+                  className={`w-7 h-9 rounded-xl flex items-center justify-center text-base font-mono font-bold transition-all duration-200 border ${
+                    isFilled
+                      ? "bg-[#1E293B] border-[#388BFD] text-[#388BFD] scale-105 shadow-md shadow-[#388BFD]/30"
+                      : "bg-[#14161D] border-[#2D333F] text-transparent"
+                  }`}
+                >
+                  {isFilled ? (
+                    showPin ? (
+                      <span>{digit}</span>
+                    ) : (
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#388BFD] inline-block shadow-xs shadow-[#388BFD]/80"></span>
+                    )
+                  ) : (
+                    <span className="text-[#333846] text-xs font-normal">−</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            id="btn-lockscreen-toggle-pin"
+            type="button"
+            onClick={() => setShowPin(!showPin)}
+            className="p-2.5 text-[#94A3B8] hover:text-[#388BFD] hover:bg-[#1E222B] rounded-2xl transition-colors cursor-pointer border border-[#2B303C] bg-[#1A1D24] shadow-xs"
+            title={showPin ? "Hide PIN digits" : "Show PIN digits"}
+            aria-label={showPin ? "Hide PIN digits" : "Show PIN digits"}
+          >
+            {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
         </div>
 
         {/* Error / Feedback Message */}

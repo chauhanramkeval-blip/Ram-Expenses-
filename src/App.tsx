@@ -33,6 +33,7 @@ import {
   syncBudgetToFirestore,
   subscribeToExpensesCollection,
   subscribeToIncomesCollection,
+  deleteUserFirestoreData,
 } from "./services/firestoreSync";
 import {
   CategoryMeta,
@@ -66,6 +67,7 @@ import {
   saveUserIncCategories,
   loadUserSecurity,
   saveUserSecurity,
+  deleteUserAllData,
 } from "./utils/userStorage";
 
 const DEFAULT_BUDGET: UserBudget = {
@@ -403,15 +405,80 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    saveUserExpenses(currentUser.id, expenses);
-    saveUserIncomes(currentUser.id, incomes);
-    saveUserBudget(currentUser.id, budget);
-    saveUserCategories(currentUser.id, customExpenseCategories);
-    saveUserIncCategories(currentUser.id, customIncomeCategories);
-    saveUserSecurity(currentUser.id, securitySettings);
+    // Save current user state before clearing session
+    if (currentUser?.id) {
+      saveUserExpenses(currentUser.id, expenses);
+      saveUserIncomes(currentUser.id, incomes);
+      saveUserBudget(currentUser.id, budget);
+      saveUserCategories(currentUser.id, customExpenseCategories);
+      saveUserIncCategories(currentUser.id, customIncomeCategories);
+      saveUserSecurity(currentUser.id, securitySettings);
+    }
 
+    // Immediately clear active user session
     setIsLoggedIn(false);
     setStoredAuthState(false);
+    setIsLocked(false);
+    setIsProfileLoginModalOpen(false);
+    setIsEditProfileOpen(false);
+    setIsAddAccountOpen(false);
+    setPendingSwitchUser(null);
+  };
+
+  /**
+   * Permanently deletes the active user's profile and all associated data,
+   * then resets the application to the initial onboarding / signup screen.
+   */
+  const handleDeleteAccount = async (targetUser: UserAccount) => {
+    const userIdToDelete = targetUser.id;
+
+    // 1. Delete Firestore cloud documents for this user
+    deleteUserFirestoreData(userIdToDelete).catch((err) => {
+      console.error("Failed to delete user data from Firestore", err);
+    });
+
+    // 2. Wipe all local storage keys for this user
+    deleteUserAllData(userIdToDelete);
+
+    // 3. Remove user from the registered users list
+    const remainingUsers = users.filter((u) => u.id !== userIdToDelete);
+    setUsers(remainingUsers);
+    saveStoredUsers(remainingUsers);
+
+    // 4. Reset authentication state & return to initial screen
+    setIsLoggedIn(false);
+    setStoredAuthState(false);
+    setOnboardingCompleted(remainingUsers.length > 0);
+    setIsLocked(false);
+    setIsProfileLoginModalOpen(false);
+    setIsEditProfileOpen(false);
+    setIsAddAccountOpen(false);
+    setPendingSwitchUser(null);
+
+    // 5. If other accounts remain, point current user to the first one, else default
+    if (remainingUsers.length > 0) {
+      const fallback = remainingUsers[0];
+      setCurrentUser(fallback);
+      setStoredCurrentUser(fallback);
+      setExpenses(loadUserExpenses(fallback.id));
+      setIncomes(loadUserIncomes(fallback.id));
+      setBudget(loadUserBudget(fallback.id, DEFAULT_BUDGET));
+      setCustomExpenseCategories(loadUserCategories(fallback.id, CATEGORY_LIST));
+      setCustomIncomeCategories(loadUserIncCategories(fallback.id, INCOME_CATEGORY_LIST));
+      setSecuritySettings(loadUserSecurity(fallback.id, DEFAULT_SECURITY));
+    } else {
+      // Complete reset to clean state
+      const defaultRamkeval = getStoredCurrentUser();
+      setCurrentUser(defaultRamkeval);
+      setStoredCurrentUser(defaultRamkeval);
+      setExpenses([]);
+      setIncomes([]);
+      setBudget(DEFAULT_BUDGET);
+      setCustomExpenseCategories(CATEGORY_LIST);
+      setCustomIncomeCategories(INCOME_CATEGORY_LIST);
+      setSecuritySettings(DEFAULT_SECURITY);
+      setOnboardingCompleted(false);
+    }
   };
 
   /**
@@ -814,6 +881,7 @@ export default function App() {
         onSwitchUser={handleSwitchUser}
         onOpenEditProfile={() => setIsEditProfileOpen(true)}
         onLogout={handleLogout}
+        onDeleteAccount={handleDeleteAccount}
         onOpenNewAccountModal={() => setIsAddAccountOpen(true)}
         onLockSession={handleLockSession}
         isFirebaseOnline={isOnline}

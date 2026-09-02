@@ -165,7 +165,7 @@ export const BudgetSettingsModal: React.FC<BudgetSettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Cloud Firestore Real-time Sync */}
+          {/* Cloud Backup & Sync */}
           {onOpenFirebaseSync && (
             <div className="p-3.5 bg-[#F8F9FA] rounded-2xl border border-[#E8EAED] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -173,9 +173,9 @@ export const BudgetSettingsModal: React.FC<BudgetSettingsModalProps> = ({
                   <Cloud size={18} />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-[#202124]">Cloud Firestore Real-time Sync</h4>
+                  <h4 className="text-xs font-bold text-[#202124]">Cloud Backup & Sync</h4>
                   <p className="text-[11px] text-[#5F6368]">
-                    Sync expenses across all devices & backup to Firestore
+                    Backup expenses and restore across devices safely
                   </p>
                 </div>
               </div>
@@ -188,7 +188,7 @@ export const BudgetSettingsModal: React.FC<BudgetSettingsModalProps> = ({
                 }}
                 className="px-3 py-1.5 bg-white hover:bg-[#E8F0FE] text-[#1A73E8] border border-[#DADCE0] hover:border-[#1A73E8] text-xs font-semibold rounded-xl transition-colors cursor-pointer shrink-0"
               >
-                Cloud Sync
+                Open Backup
               </button>
             </div>
           )}

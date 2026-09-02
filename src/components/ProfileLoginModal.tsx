@@ -74,6 +74,7 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
   const [selectedUser, setSelectedUser] = useState<UserAccount>(fallbackUser);
   const [authMethod, setAuthMethod] = useState<AuthMethod>("pin");
   const [pin, setPin] = useState<string>("");
+  const [showPin, setShowPin] = useState<boolean>(false);
   const [password, setPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -383,9 +384,17 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
                         <div className="text-[10px] text-[#5F6368] truncate">{u.email}</div>
                       </div>
                     </div>
-                    <span className="text-[10px] text-[#80868B] px-1.5 py-0.5 bg-[#F8F9FA] rounded-md shrink-0">
-                      PIN: {getUserEffectivePin(u)}
-                    </span>
+                    {isSelected ? (
+                      <span className="text-[10px] font-bold text-[#1A73E8] bg-white px-2 py-0.5 rounded-full border border-[#D2E3FC] shrink-0 flex items-center gap-1">
+                        <KeyRound size={10} className="text-[#1A73E8]" />
+                        <span>Selected</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium text-[#5F6368] bg-[#F1F3F4] px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 border border-[#E8EAED]">
+                        <Lock size={10} className="text-[#5F6368]" />
+                        <span>Locked</span>
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -458,25 +467,50 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
             {/* TAB 1: 4-Digit PIN */}
             {authMethod === "pin" && (
               <div className="space-y-4">
-                {/* PIN Masked Bullets */}
-                <div
-                  className={`flex items-center justify-center gap-3.5 py-3 ${
-                    isShaking ? "animate-shake" : ""
-                  }`}
-                >
-                  {[0, 1, 2, 3].map((idx) => {
-                    const isFilled = pin.length > idx;
-                    return (
-                      <div
-                        key={idx}
-                        className={`w-4 h-4 rounded-full transition-all duration-200 ${
-                          isFilled
-                            ? "bg-[#1A73E8] scale-125 shadow-xs"
-                            : "bg-[#E8EAED] border border-[#DADCE0]"
-                        }`}
-                      />
-                    );
-                  })}
+                {/* PIN Display & Masking with Eye Toggle */}
+                <div className="flex items-center justify-center gap-2.5 py-1">
+                  <div
+                    className={`flex items-center justify-center gap-2.5 py-2 px-4 bg-[#F8F9FA] rounded-2xl border border-[#E8EAED] shadow-2xs ${
+                      isShaking ? "animate-shake border-[#EA4335]" : ""
+                    }`}
+                  >
+                    {[0, 1, 2, 3].map((idx) => {
+                      const isFilled = pin.length > idx;
+                      const digit = pin[idx];
+                      return (
+                        <div
+                          key={idx}
+                          className={`w-7 h-9 rounded-xl flex items-center justify-center text-base font-mono font-bold transition-all duration-200 border ${
+                            isFilled
+                              ? "bg-white border-[#1A73E8] text-[#1A73E8] shadow-xs scale-105"
+                              : "bg-white/60 border-[#DADCE0] text-transparent"
+                          }`}
+                        >
+                          {isFilled ? (
+                            showPin ? (
+                              <span>{digit}</span>
+                            ) : (
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#1A73E8] inline-block"></span>
+                            )
+                          ) : (
+                            <span className="text-[#DADCE0] text-xs font-normal">−</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Eye Toggle Button */}
+                  <button
+                    id="btn-toggle-pin-visibility"
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    className="p-2.5 text-[#5F6368] hover:text-[#1A73E8] hover:bg-[#F1F3F4] rounded-2xl transition-colors cursor-pointer border border-[#E8EAED] bg-white shadow-2xs"
+                    title={showPin ? "Hide PIN digits" : "Show PIN digits"}
+                    aria-label={showPin ? "Hide PIN digits" : "Show PIN digits"}
+                  >
+                    {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
 
                 {/* Error Banner */}
@@ -531,7 +565,7 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
                     className="text-[11px] font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-2.5 py-1 rounded-full border border-[#D2E3FC] transition-colors cursor-pointer flex items-center gap-1"
                   >
                     <Sparkles size={12} />
-                    <span>Auto-Fill PIN ({targetPin})</span>
+                    <span>Auto-Fill (••••)</span>
                   </button>
 
                   <button

@@ -241,3 +241,21 @@ export function saveUserSecurity(userId: string, security: AppSecuritySettings):
     console.error(`Failed to save security for user ${userId}`, e);
   }
 }
+
+/**
+ * Permanently deletes all isolated local storage keys associated with a user.
+ */
+export function deleteUserAllData(userId: string): void {
+  if (!userId) return;
+  try {
+    localStorage.removeItem(getUserExpensesStorageKey(userId));
+    localStorage.removeItem(getUserIncomesStorageKey(userId));
+    localStorage.removeItem(getUserBudgetStorageKey(userId));
+    localStorage.removeItem(getUserCategoriesStorageKey(userId));
+    localStorage.removeItem(getUserIncCategoriesStorageKey(userId));
+    localStorage.removeItem(getUserSecurityStorageKey(userId));
+    localStorage.removeItem(`khata_firestore_last_sync_${userId}`);
+  } catch (e) {
+    console.error(`Failed to delete storage data for user ${userId}`, e);
+  }
+}
