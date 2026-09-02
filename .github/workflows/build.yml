@@ -34,6 +34,23 @@ jobs:
           npx cap add android
           npx cap copy
 
+      - name: Fix Duplicate Kotlin Classes
+        run: |
+          cat << 'EOF' >> android/app/build.gradle
+
+          configurations.all {
+              resolutionStrategy {
+                  eachDependency { DependencyResolveDetails details ->
+                      if (details.requested.group == 'org.jetbrains.kotlin') {
+                          if (details.requested.name == 'kotlin-stdlib-jdk7' || details.requested.name == 'kotlin-stdlib-jdk8') {
+                              details.useTarget("org.jetbrains.kotlin:kotlin-stdlib:${details.requested.version}")
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
+
       - name: Build Debug APK
         run: |
           cd android
@@ -45,4 +62,3 @@ jobs:
         with:
           name: Ram-Expenses-APK
           path: android/app/build/outputs/apk/debug/*.apk
-          
