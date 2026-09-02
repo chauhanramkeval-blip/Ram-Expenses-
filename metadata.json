@@ -1,0 +1,6 @@
+{
+  "name": "Khata: Daily Expense & Finance Advisor",
+  "description": "Google Files styled daily expense tracker with category breakdown, interactive pie charts, and AI financial advice tailored for Indian users.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
