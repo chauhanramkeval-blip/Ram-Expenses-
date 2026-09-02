@@ -15,11 +15,23 @@ import { AddAccountModal } from "./components/AddAccountModal";
 import { AuthScreen } from "./components/AuthScreen";
 import { LockScreen } from "./components/LockScreen";
 import { ExportModal } from "./components/ExportModal";
+import { BackupModal } from "./components/BackupModal";
+import { FirebaseSyncModal } from "./components/FirebaseSyncModal";
 import { PdfReportModal } from "./components/PdfReportModal";
 import { InstallAppModal } from "./components/InstallAppModal";
 import { BottomNav } from "./components/BottomNav";
 import { INITIAL_EXPENSES, INITIAL_INCOMES } from "./data/initialExpenses";
 import { CATEGORY_LIST, INCOME_CATEGORY_LIST } from "./data/categories";
+import { KhataFullBackupData } from "./utils/backup";
+import {
+  syncExpenseToFirestore,
+  deleteExpenseFromFirestore,
+  syncIncomeToFirestore,
+  deleteIncomeFromFirestore,
+  syncBudgetToFirestore,
+  subscribeToExpensesCollection,
+  subscribeToIncomesCollection,
+} from "./services/firestoreSync";
 import {
   CategoryMeta,
   Expense,
@@ -168,10 +180,82 @@ export default function App() {
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isFirebaseSyncModalOpen, setIsFirebaseSyncModalOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [isFirebaseSynced, setIsFirebaseSynced] = useState<boolean>(true);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [categoryModalTab, setCategoryModalTab] = useState<"expense" | "income">("expense");
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // Network online/offline status listener
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // Real-time Firestore live synchronization listener
+  useEffect(() => {
+    const unsubExpenses = subscribeToExpensesCollection((remoteExpenses) => {
+      if (remoteExpenses && remoteExpenses.length > 0) {
+        setExpenses((prev) => {
+          const prevMap = new Map<string, Expense>(prev.map((e) => [e.id, e]));
+          let hasDiff = false;
+          remoteExpenses.forEach((re) => {
+            const existing = prevMap.get(re.id);
+            if (!existing || JSON.stringify(existing) !== JSON.stringify(re)) {
+              prevMap.set(re.id, re);
+              hasDiff = true;
+            }
+          });
+          if (hasDiff) {
+            const merged = Array.from(prevMap.values());
+            merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            return merged;
+          }
+          return prev;
+        });
+        setIsFirebaseSynced(true);
+      }
+    });
+
+    const unsubIncomes = subscribeToIncomesCollection((remoteIncomes) => {
+      if (remoteIncomes && remoteIncomes.length > 0) {
+        setIncomes((prev) => {
+          const prevMap = new Map<string, Income>(prev.map((i) => [i.id, i]));
+          let hasDiff = false;
+          remoteIncomes.forEach((ri) => {
+            const existing = prevMap.get(ri.id);
+            if (!existing || JSON.stringify(existing) !== JSON.stringify(ri)) {
+              prevMap.set(ri.id, ri);
+              hasDiff = true;
+            }
+          });
+          if (hasDiff) {
+            const merged = Array.from(prevMap.values());
+            merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            return merged;
+          }
+          return prev;
+        });
+        setIsFirebaseSynced(true);
+      }
+    });
+
+    return () => {
+      if (unsubExpenses) unsubExpenses();
+      if (unsubIncomes) unsubIncomes();
+    };
+  }, []);
 
   // Sync users and authentication state
   useEffect(() => {
@@ -185,6 +269,43 @@ export default function App() {
   useEffect(() => {
     setStoredAuthState(isLoggedIn);
   }, [isLoggedIn]);
+
+  // Handle Backup Restoration
+  const handleRestoreBackup = (backupData: KhataFullBackupData, mode: "replace" | "merge") => {
+    if (mode === "replace") {
+      if (Array.isArray(backupData.expenses)) {
+        setExpenses(backupData.expenses);
+      }
+      if (Array.isArray(backupData.incomes)) {
+        setIncomes(backupData.incomes);
+      }
+      if (backupData.budget) {
+        setBudget(backupData.budget);
+      }
+      if (Array.isArray(backupData.customExpenseCategories)) {
+        setCustomExpenseCategories(backupData.customExpenseCategories);
+      }
+      if (Array.isArray(backupData.customIncomeCategories)) {
+        setCustomIncomeCategories(backupData.customIncomeCategories);
+      }
+    } else {
+      // Merge mode: Add records that don't exist by ID
+      if (Array.isArray(backupData.expenses)) {
+        setExpenses((prev) => {
+          const existingIds = new Set(prev.map((e) => e.id));
+          const newItems = backupData.expenses.filter((e) => !existingIds.has(e.id));
+          return [...prev, ...newItems];
+        });
+      }
+      if (Array.isArray(backupData.incomes)) {
+        setIncomes((prev) => {
+          const existingIds = new Set(prev.map((i) => i.id));
+          const newItems = backupData.incomes.filter((i) => !existingIds.has(i.id));
+          return [...prev, ...newItems];
+        });
+      }
+    }
+  };
 
   // Auth & Profile Handlers
   const handleLogin = (user: UserAccount) => {
@@ -367,22 +488,38 @@ export default function App() {
     expenseData: Omit<Expense, "id">,
     editId?: string
   ) => {
+    let savedExpense: Expense;
     if (editId) {
+      savedExpense = { ...expenseData, id: editId };
       setExpenses((prev) =>
-        prev.map((e) => (e.id === editId ? { ...expenseData, id: editId } : e))
+        prev.map((e) => (e.id === editId ? savedExpense : e))
       );
     } else {
-      const newExpense: Expense = {
+      savedExpense = {
         ...expenseData,
         id: `exp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       };
-      setExpenses((prev) => [newExpense, ...prev]);
+      setExpenses((prev) => [savedExpense, ...prev]);
     }
     setEditingExpense(null);
+
+    // Instant Real-time Cloud Sync
+    setIsFirebaseSynced(false);
+    syncExpenseToFirestore(savedExpense)
+      .then((success) => {
+        if (success) setIsFirebaseSynced(true);
+      })
+      .catch(() => {});
   };
 
   const handleDeleteExpense = (id: string) => {
     setExpenses((prev) => prev.filter((e) => e.id !== id));
+    setIsFirebaseSynced(false);
+    deleteExpenseFromFirestore(id)
+      .then((success) => {
+        if (success) setIsFirebaseSynced(true);
+      })
+      .catch(() => {});
   };
 
   const handleEditExpense = (expense: Expense) => {
@@ -395,27 +532,48 @@ export default function App() {
     incomeData: Omit<Income, "id">,
     editId?: string
   ) => {
+    let savedIncome: Income;
     if (editId) {
+      savedIncome = { ...incomeData, id: editId };
       setIncomes((prev) =>
-        prev.map((inc) => (inc.id === editId ? { ...incomeData, id: editId } : inc))
+        prev.map((inc) => (inc.id === editId ? savedIncome : inc))
       );
     } else {
-      const newIncome: Income = {
+      savedIncome = {
         ...incomeData,
         id: `inc-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       };
-      setIncomes((prev) => [newIncome, ...prev]);
+      setIncomes((prev) => [savedIncome, ...prev]);
     }
     setEditingIncome(null);
+
+    // Instant Real-time Cloud Sync
+    setIsFirebaseSynced(false);
+    syncIncomeToFirestore(savedIncome)
+      .then((success) => {
+        if (success) setIsFirebaseSynced(true);
+      })
+      .catch(() => {});
   };
 
   const handleDeleteIncome = (id: string) => {
     setIncomes((prev) => prev.filter((inc) => inc.id !== id));
+    setIsFirebaseSynced(false);
+    deleteIncomeFromFirestore(id)
+      .then((success) => {
+        if (success) setIsFirebaseSynced(true);
+      })
+      .catch(() => {});
   };
 
   const handleEditIncome = (income: Income) => {
     setEditingIncome(income);
     setIsAddIncomeOpen(true);
+  };
+
+  const handleSaveBudget = (newBudget: UserBudget) => {
+    setBudget(newBudget);
+    syncBudgetToFirestore(newBudget).catch(() => {});
   };
 
   const handleResetData = () => {
@@ -473,6 +631,8 @@ export default function App() {
         }}
         onOpenPdfReportModal={() => setIsPdfModalOpen(true)}
         onOpenExportModal={() => setIsExportModalOpen(true)}
+        onOpenBackupModal={() => setIsBackupModalOpen(true)}
+        onOpenFirebaseSync={() => setIsFirebaseSyncModalOpen(true)}
         onOpenInstallModal={() => setIsInstallModalOpen(true)}
         onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
         onOpenCategoryManager={() => handleOpenCategoryManager(activeTab === "incomes" ? "income" : "expense")}
@@ -484,6 +644,8 @@ export default function App() {
         onOpenEditProfile={() => setIsEditProfileOpen(true)}
         onLogout={handleLogout}
         onOpenNewAccountModal={() => setIsAddAccountOpen(true)}
+        isFirebaseOnline={isOnline}
+        isFirebaseSynced={isFirebaseSynced}
       />
 
       {/* Main App Canvas */}
@@ -622,6 +784,19 @@ export default function App() {
         onClose={() => setIsExportModalOpen(false)}
         expenses={expenses}
         filteredExpenses={expenses}
+        onOpenBackupModal={() => setIsBackupModalOpen(true)}
+      />
+
+      <BackupModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        expenses={expenses}
+        incomes={incomes}
+        budget={budget}
+        currentUser={currentUser}
+        customExpenseCategories={customExpenseCategories}
+        customIncomeCategories={customIncomeCategories}
+        onRestoreBackup={handleRestoreBackup}
       />
 
       <InstallAppModal
@@ -635,10 +810,25 @@ export default function App() {
         isOpen={isBudgetModalOpen}
         onClose={() => setIsBudgetModalOpen(false)}
         budget={budget}
-        onSaveBudget={setBudget}
+        onSaveBudget={handleSaveBudget}
         onResetData={handleResetData}
         isSecurityEnabled={securitySettings.isEnabled}
         onOpenSecuritySettings={() => setIsSecurityModalOpen(true)}
+        onOpenBackupModal={() => setIsBackupModalOpen(true)}
+        onOpenFirebaseSync={() => setIsFirebaseSyncModalOpen(true)}
+      />
+
+      <FirebaseSyncModal
+        isOpen={isFirebaseSyncModalOpen}
+        onClose={() => setIsFirebaseSyncModalOpen(false)}
+        expenses={expenses}
+        incomes={incomes}
+        budget={budget}
+        onSyncCompleted={(newExpenses, newIncomes) => {
+          setExpenses(newExpenses);
+          setIncomes(newIncomes);
+          setIsFirebaseSynced(true);
+        }}
       />
 
       <SecuritySettingsModal

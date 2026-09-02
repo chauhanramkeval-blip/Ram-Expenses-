@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Matches all documents in expenses collection
+    match /expenses/{expenseId} {
+      allow read, write: if true;
+    }
+    // Matches all documents in incomes collection
+    match /incomes/{incomeId} {
+      allow read, write: if true;
+    }
+    // Matches settings, profiles, and backup docs
+    match /settings/{docId} {
+      allow read, write: if true;
+    }
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    // Default fallback
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

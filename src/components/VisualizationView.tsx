@@ -159,6 +159,48 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     };
   }, [expenses, monthlyBudget]);
 
+  // Predict End-of-Month spending based on current daily consumption
+  const endOfMonthPrediction = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthIdx = now.getMonth();
+    const totalDaysInMonth = new Date(currentYear, currentMonthIdx + 1, 0).getDate();
+    const daysElapsed = Math.max(1, now.getDate());
+    const daysRemaining = Math.max(0, totalDaysInMonth - daysElapsed);
+
+    const currentMonthExp = expenses.filter((e) => {
+      if (!e.date) return false;
+      const d = new Date(e.date);
+      return d.getMonth() === currentMonthIdx && d.getFullYear() === currentYear;
+    });
+
+    const totalSpentSoFar = currentMonthExp.reduce((sum, e) => sum + e.amount, 0);
+    const dailyAverageBurn = totalSpentSoFar / daysElapsed;
+    const projectedEndOfMonth = Math.round(dailyAverageBurn * totalDaysInMonth);
+    const remainingBudget = Math.max(0, monthlyBudget - totalSpentSoFar);
+    const safeDailyAllowanceRemaining =
+      daysRemaining > 0 ? Math.round(remainingBudget / daysRemaining) : 0;
+    const varianceFromBudget = projectedEndOfMonth - monthlyBudget;
+    const isOverBudget = varianceFromBudget > 0;
+    const projectedPercent =
+      monthlyBudget > 0 ? Math.round((projectedEndOfMonth / monthlyBudget) * 100) : 0;
+
+    return {
+      monthName: now.toLocaleString("default", { month: "long" }),
+      totalDaysInMonth,
+      daysElapsed,
+      daysRemaining,
+      totalSpentSoFar,
+      dailyAverageBurn: Math.round(dailyAverageBurn),
+      projectedEndOfMonth,
+      remainingBudget,
+      safeDailyAllowanceRemaining,
+      varianceFromBudget: Math.abs(varianceFromBudget),
+      isOverBudget,
+      projectedPercent,
+    };
+  }, [expenses, monthlyBudget]);
+
   // Filter expenses according to selected Date Range (Start Date ~ End Date)
   const filteredExpenses = useMemo(() => {
     return expenses.filter((e) => {
@@ -503,6 +545,95 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
               {momComparison.hasDecreased ? "-" : "+"}
               {formatINR(Math.abs(momComparison.diff))}
             </span>
+          </div>
+        </div>
+
+        {/* End-of-Month Spending Prediction Summary */}
+        <div
+          id="end-of-month-prediction-card"
+          className="mt-4 bg-[#F8F9FA] rounded-2xl p-4 sm:p-5 border border-[#E8EAED] shadow-2xs"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#E8EAED]">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center font-bold">
+                <Zap size={16} />
+              </div>
+              <div>
+                <h4 className="text-xs sm:text-sm font-bold text-[#202124] flex items-center gap-1.5">
+                  <span>End-of-Month Spending Prediction</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E8F0FE] text-[#1A73E8]">
+                    {endOfMonthPrediction.monthName} Forecast
+                  </span>
+                </h4>
+                <p className="text-[11px] text-[#5F6368]">
+                  Extrapolated from your current daily burn rate of {formatINR(endOfMonthPrediction.dailyAverageBurn)}/day (Days 1–{endOfMonthPrediction.daysElapsed} of {endOfMonthPrediction.totalDaysInMonth})
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={`px-3 py-1 rounded-full text-xs font-bold self-start sm:self-auto border flex items-center gap-1.5 ${
+                endOfMonthPrediction.isOverBudget
+                  ? "bg-[#FCE8E6] text-[#C5221F] border-[#FAD2CF]"
+                  : "bg-[#E6F4EA] text-[#137333] border-[#CEEAD6]"
+              }`}
+            >
+              {endOfMonthPrediction.isOverBudget ? (
+                <>
+                  <AlertTriangle size={13} />
+                  <span>Projected Over Budget by {formatINR(endOfMonthPrediction.varianceFromBudget)}</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={13} />
+                  <span>Projected Within Budget ({formatINR(endOfMonthPrediction.varianceFromBudget)} surplus)</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3.5">
+            <div className="bg-white p-3 rounded-xl border border-[#E8EAED]">
+              <span className="text-[10px] text-[#5F6368] font-medium block">Current Spent</span>
+              <span className="text-sm sm:text-base font-bold text-[#202124]">
+                {formatINR(endOfMonthPrediction.totalSpentSoFar)}
+              </span>
+              <span className="text-[10px] text-[#80868B] block mt-0.5">
+                {endOfMonthPrediction.daysElapsed} days passed
+              </span>
+            </div>
+
+            <div className="bg-white p-3 rounded-xl border border-[#E8EAED]">
+              <span className="text-[10px] text-[#5F6368] font-medium block">Current Daily Pace</span>
+              <span className="text-sm sm:text-base font-bold text-[#1A73E8]">
+                {formatINR(endOfMonthPrediction.dailyAverageBurn)}
+              </span>
+              <span className="text-[10px] text-[#80868B] block mt-0.5">per day average</span>
+            </div>
+
+            <div className="bg-white p-3 rounded-xl border border-[#E8EAED]">
+              <span className="text-[10px] text-[#5F6368] font-medium block">Predicted Month-End</span>
+              <span
+                className={`text-sm sm:text-base font-bold ${
+                  endOfMonthPrediction.isOverBudget ? "text-[#C5221F]" : "text-[#137333]"
+                }`}
+              >
+                {formatINR(endOfMonthPrediction.projectedEndOfMonth)}
+              </span>
+              <span className="text-[10px] text-[#80868B] block mt-0.5">
+                {endOfMonthPrediction.projectedPercent}% of {formatINR(monthlyBudget)}
+              </span>
+            </div>
+
+            <div className="bg-white p-3 rounded-xl border border-[#E8EAED]">
+              <span className="text-[10px] text-[#5F6368] font-medium block">Safe Daily Allowance</span>
+              <span className="text-sm sm:text-base font-bold text-[#202124]">
+                {formatINR(endOfMonthPrediction.safeDailyAllowanceRemaining)}
+              </span>
+              <span className="text-[10px] text-[#80868B] block mt-0.5">
+                for remaining {endOfMonthPrediction.daysRemaining} days
+              </span>
+            </div>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, FileSpreadsheet, Download, Check, FileText } from "lucide-react";
+import { X, FileSpreadsheet, Download, Check, FileText, Mail } from "lucide-react";
 import { Expense } from "../types";
 import { formatINR } from "../utils/formatters";
 
@@ -8,6 +8,7 @@ interface ExportModalProps {
   onClose: () => void;
   expenses: Expense[];
   filteredExpenses: Expense[];
+  onOpenBackupModal?: () => void;
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({
@@ -15,6 +16,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   onClose,
   expenses,
   filteredExpenses,
+  onOpenBackupModal,
 }) => {
   const [exportScope, setExportScope] = useState<"all" | "filtered" | "current-month">("all");
   const [copied, setCopied] = useState(false);
@@ -180,6 +182,23 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <span>Download .CSV</span>
             </button>
           </div>
+
+          {onOpenBackupModal && (
+            <div className="pt-2 border-t border-[#F1F3F4] text-center">
+              <button
+                type="button"
+                id="btn-switch-to-email-backup"
+                onClick={() => {
+                  onClose();
+                  onOpenBackupModal();
+                }}
+                className="text-xs font-semibold text-[#1A73E8] hover:underline inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Mail size={14} />
+                <span>Looking for Full Email Backup or .JSON file? Click here</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

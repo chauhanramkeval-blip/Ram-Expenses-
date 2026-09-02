@@ -11,6 +11,7 @@ import {
   Phone,
   QrCode,
   Sparkles,
+  Cloud,
 } from "lucide-react";
 import { UserAccount } from "../types";
 import { getInitials } from "../utils/auth";
@@ -21,6 +22,8 @@ interface UserProfileMenuProps {
   onSwitchUser: (user: UserAccount) => void;
   onOpenEditProfile: () => void;
   onOpenSecurityModal: () => void;
+  onOpenBackupModal?: () => void;
+  onOpenFirebaseSync?: () => void;
   onLogout: () => void;
   onOpenNewAccountModal: () => void;
 }
@@ -31,6 +34,8 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
   onSwitchUser,
   onOpenEditProfile,
   onOpenSecurityModal,
+  onOpenBackupModal,
+  onOpenFirebaseSync,
   onLogout,
   onOpenNewAccountModal,
 }) => {
@@ -202,6 +207,36 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
               <User size={15} className="text-[#1A73E8]" />
               <span>Edit Khata Profile</span>
             </button>
+
+            {onOpenFirebaseSync && (
+              <button
+                id="btn-firebase-sync-menu-item"
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenFirebaseSync();
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-semibold text-[#202124] hover:bg-[#F1F3F4] rounded-xl transition-colors cursor-pointer"
+              >
+                <Cloud size={15} className="text-[#1A73E8]" />
+                <span>Cloud Firestore Sync</span>
+              </button>
+            )}
+
+            {onOpenBackupModal && (
+              <button
+                id="btn-backup-menu-item"
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenBackupModal();
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-semibold text-[#202124] hover:bg-[#F1F3F4] rounded-xl transition-colors cursor-pointer"
+              >
+                <Mail size={15} className="text-[#1A73E8]" />
+                <span>Export / Email Backup</span>
+              </button>
+            )}
 
             <button
               id="btn-security-menu-item"

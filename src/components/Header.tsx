@@ -11,6 +11,8 @@ import {
   Smartphone,
   Lock,
   Fingerprint,
+  Mail,
+  Cloud,
 } from "lucide-react";
 import { formatINR } from "../utils/formatters";
 import { UserAccount } from "../types";
@@ -28,6 +30,8 @@ interface HeaderProps {
   onOpenAddIncome: () => void;
   onOpenPdfReportModal: () => void;
   onOpenExportModal: () => void;
+  onOpenBackupModal: () => void;
+  onOpenFirebaseSync?: () => void;
   onOpenInstallModal: () => void;
   onOpenBudgetModal: () => void;
   onOpenCategoryManager?: () => void;
@@ -39,6 +43,8 @@ interface HeaderProps {
   onOpenEditProfile?: () => void;
   onLogout?: () => void;
   onOpenNewAccountModal?: () => void;
+  isFirebaseOnline?: boolean;
+  isFirebaseSynced?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -53,6 +59,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAddIncome,
   onOpenPdfReportModal,
   onOpenExportModal,
+  onOpenBackupModal,
+  onOpenFirebaseSync,
   onOpenInstallModal,
   onOpenBudgetModal,
   onOpenCategoryManager,
@@ -64,6 +72,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenEditProfile = () => {},
   onLogout = () => {},
   onOpenNewAccountModal = () => {},
+  isFirebaseOnline = true,
+  isFirebaseSynced = true,
 }) => {
   return (
     <header id="khata-app-header" className="sticky top-0 z-30 bg-white border-b border-[#E8EAED] shadow-xs">
@@ -122,6 +132,32 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2">
+            {onOpenFirebaseSync && (
+              <button
+                id="btn-cloud-sync-header"
+                onClick={onOpenFirebaseSync}
+                title={
+                  !isFirebaseOnline
+                    ? "Offline Mode - Click to view sync status"
+                    : isFirebaseSynced
+                    ? "Cloud Firestore Synced - Click to manage"
+                    : "Syncing changes to Firestore..."
+                }
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] rounded-full transition-colors cursor-pointer border border-[#D2E3FC] relative"
+              >
+                <Cloud size={15} />
+                <span className="hidden sm:inline">Cloud Sync</span>
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    !isFirebaseOnline
+                      ? "bg-[#FBBC04]"
+                      : isFirebaseSynced
+                      ? "bg-[#188038]"
+                      : "bg-[#1A73E8] animate-ping"
+                  }`}
+                />
+              </button>
+            )}
             <button
               id="btn-pdf-statement-header"
               onClick={onOpenPdfReportModal}
@@ -130,6 +166,15 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <FileText size={15} />
               <span className="hidden sm:inline">PDF Report</span>
+            </button>
+            <button
+              id="btn-backup-email-header"
+              onClick={onOpenBackupModal}
+              title="Export / Email Backup (Send to chauhanramkeval@gmail.com or download .json)"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] rounded-full transition-colors cursor-pointer border border-[#D2E3FC]"
+            >
+              <Mail size={15} />
+              <span className="hidden sm:inline">Email Backup</span>
             </button>
             <button
               id="btn-export-csv-header"
@@ -205,6 +250,8 @@ export const Header: React.FC<HeaderProps> = ({
                 onSwitchUser={onSwitchUser}
                 onOpenEditProfile={onOpenEditProfile}
                 onOpenSecurityModal={onOpenSecurityModal || (() => {})}
+                onOpenBackupModal={onOpenBackupModal}
+                onOpenFirebaseSync={onOpenFirebaseSync}
                 onLogout={onLogout}
                 onOpenNewAccountModal={onOpenNewAccountModal}
               />

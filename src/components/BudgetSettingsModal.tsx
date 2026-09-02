@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Check, Sliders, DollarSign, RefreshCw, ShieldCheck, Lock } from "lucide-react";
+import { X, Check, Sliders, DollarSign, RefreshCw, ShieldCheck, Lock, Mail, Download, Cloud } from "lucide-react";
 import { UserBudget } from "../types";
 import { formatINR } from "../utils/formatters";
 
@@ -11,6 +11,8 @@ interface BudgetSettingsModalProps {
   onResetData: () => void;
   isSecurityEnabled?: boolean;
   onOpenSecuritySettings?: () => void;
+  onOpenBackupModal?: () => void;
+  onOpenFirebaseSync?: () => void;
 }
 
 const BUDGET_PRESETS = [
@@ -28,6 +30,8 @@ export const BudgetSettingsModal: React.FC<BudgetSettingsModalProps> = ({
   onResetData,
   isSecurityEnabled = false,
   onOpenSecuritySettings,
+  onOpenBackupModal,
+  onOpenFirebaseSync,
 }) => {
   const [monthlyBudget, setMonthlyBudget] = useState(budget.monthlyBudget.toString());
   const [monthlyIncome, setMonthlyIncome] = useState((budget.monthlyIncome || 50000).toString());
@@ -160,6 +164,62 @@ export const BudgetSettingsModal: React.FC<BudgetSettingsModalProps> = ({
               <span>50% (Aggressive FIRE)</span>
             </div>
           </div>
+
+          {/* Cloud Firestore Real-time Sync */}
+          {onOpenFirebaseSync && (
+            <div className="p-3.5 bg-[#F8F9FA] rounded-2xl border border-[#E8EAED] flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center font-bold">
+                  <Cloud size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-[#202124]">Cloud Firestore Real-time Sync</h4>
+                  <p className="text-[11px] text-[#5F6368]">
+                    Sync expenses across all devices & backup to Firestore
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                id="btn-open-firebase-from-settings"
+                onClick={() => {
+                  onClose();
+                  onOpenFirebaseSync();
+                }}
+                className="px-3 py-1.5 bg-white hover:bg-[#E8F0FE] text-[#1A73E8] border border-[#DADCE0] hover:border-[#1A73E8] text-xs font-semibold rounded-xl transition-colors cursor-pointer shrink-0"
+              >
+                Cloud Sync
+              </button>
+            </div>
+          )}
+
+          {/* Export & Email Backup Shortcut */}
+          {onOpenBackupModal && (
+            <div className="p-3.5 bg-[#F8F9FA] rounded-2xl border border-[#E8EAED] flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center font-bold">
+                  <Mail size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-[#202124]">Export / Email Backup</h4>
+                  <p className="text-[11px] text-[#5F6368]">
+                    Send summary to chauhanramkeval@gmail.com or download .json
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                id="btn-open-backup-from-settings"
+                onClick={() => {
+                  onClose();
+                  onOpenBackupModal();
+                }}
+                className="px-3 py-1.5 bg-white hover:bg-[#E8F0FE] text-[#1A73E8] border border-[#DADCE0] hover:border-[#1A73E8] text-xs font-semibold rounded-xl transition-colors cursor-pointer shrink-0"
+              >
+                Backup Data
+              </button>
+            </div>
+          )}
 
           {/* App Privacy & Biometric Lock Shortcut */}
           {onOpenSecuritySettings && (
