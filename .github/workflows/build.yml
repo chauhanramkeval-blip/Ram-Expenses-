@@ -1,4 +1,4 @@
-name: Web to APK Builder
+name: Build Android APK
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Web Code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -22,24 +22,27 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android Project via Capacitor
+      - name: Install Dependencies and Build Web App
         run: |
-          mkdir www
-          find . -maxdepth 1 -not -name 'www' -not -name '.git' -not -name '.github' -exec mv {} www/ 2>/dev/null || true
-          npm init -y
+          npm install
+          npx vite build
+
+      - name: Setup Capacitor and Android
+        run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "MeraApp" "com.mycompany.meraapp" --web-dir www
+          npx cap init "RamExpenses" "com.ramkeval.expenses" --web-dir dist
           npx cap add android
+          npx cap copy
 
       - name: Build Debug APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Mera-App-Debug-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: Ram-Expenses-APK
+          path: android/app/build/outputs/apk/debug/*.apk
           
