@@ -779,7 +779,7 @@ export default function App() {
   return (
     <>
       <div
-        className={`min-h-screen bg-[#F8F9FA] text-[#202124] flex flex-col font-sans transition-all duration-300 ${
+        className={`min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#F8F9FA] text-[#202124] flex flex-col font-sans transition-all duration-300 ${
           !isLoggedIn ? "pointer-events-none select-none filter blur-[3px] opacity-60" : ""
         }`}
       >
@@ -821,7 +821,7 @@ export default function App() {
       />
 
       {/* Main App Canvas */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 pt-5 pb-24 sm:pb-16">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-24 sm:pb-16 overflow-x-hidden">
         {/* Tab 1: Daily Expenses View */}
         {activeTab === "expenses" && (
           <div className="animate-fadeIn">
@@ -1040,6 +1040,7 @@ export default function App() {
       <ProfileLoginModal
         isOpen={isProfileLoginModalOpen}
         targetUser={pendingSwitchUser || currentUser}
+        allUsers={users}
         onClose={() => {
           setIsProfileLoginModalOpen(false);
           setPendingSwitchUser(null);

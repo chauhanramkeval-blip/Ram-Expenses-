@@ -37,7 +37,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   const generateCSV = () => {
     const data = getExportData();
-    const headers = ["ID", "Date", "Title", "Amount (INR)", "Category", "Payment Mode", "Merchant / Vendor", "Notes", "Created At"];
+    const headers = ["ID", "Date", "Title", "Amount (INR)", "Category", "Payment Mode", "Merchant / Vendor", "Notes", "Synced At"];
     
     const rows = data.map((e) => [
       `"${e.id}"`,
@@ -46,9 +46,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       e.amount,
       `"${e.category}"`,
       `"${e.paymentMode}"`,
-      `"${(e.merchant || "").replace(/"/g, '""')}"`,
+      `"${(e.merchantOrLocation || "").replace(/"/g, '""')}"`,
       `"${(e.notes || "").replace(/"/g, '""')}"`,
-      `"${e.createdAt || ""}"`,
+      `"${e.syncedAt || ""}"`,
     ]);
 
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");

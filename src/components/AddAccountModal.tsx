@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, UserPlus, Sparkles, Building2, User, Mail, Phone, Lock, KeyRound } from "lucide-react";
 import { UserAccount } from "../types";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 interface AddAccountModalProps {
   isOpen: boolean;
@@ -8,7 +9,16 @@ interface AddAccountModalProps {
   onAddAccount: (user: UserAccount) => void;
 }
 
-export const AddAccountModal: React.FC<AddAccountModalProps> = ({
+export const AddAccountModal: React.FC<AddAccountModalProps> = (props) => {
+  if (!props.isOpen) return null;
+  return (
+    <ErrorBoundary fallbackTitle="Add Account Error" fallbackMessage="Could not load add account dialog.">
+      <AddAccountModalContent {...props} />
+    </ErrorBoundary>
+  );
+};
+
+const AddAccountModalContent: React.FC<AddAccountModalProps> = ({
   isOpen,
   onClose,
   onAddAccount,

@@ -152,11 +152,11 @@ export const StorageMeterCard: React.FC<StorageMeterCardProps> = ({
           <span className="text-[11px] hidden md:inline">({daysLeft} days remaining in month)</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             id="btn-meter-pdf-report"
             onClick={onOpenPdfReportModal}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-[#EA4335] bg-[#FCE8E6] hover:bg-[#FAD2CF] transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold text-[#EA4335] bg-[#FCE8E6] hover:bg-[#FAD2CF] transition-colors cursor-pointer"
           >
             <FileText size={13} />
             <span>PDF Summary</span>
@@ -165,7 +165,7 @@ export const StorageMeterCard: React.FC<StorageMeterCardProps> = ({
           <button
             id="btn-meter-visuals"
             onClick={onNavigateToVisuals}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] transition-colors cursor-pointer"
           >
             <PieChart size={13} />
             <span>Pie Chart</span>
@@ -174,7 +174,7 @@ export const StorageMeterCard: React.FC<StorageMeterCardProps> = ({
           <button
             id="btn-meter-advisor"
             onClick={onNavigateToAdvisor}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-[#B06000] bg-[#FEF7E0] hover:bg-[#FEEFC3] transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold text-[#B06000] bg-[#FEF7E0] hover:bg-[#FEEFC3] transition-colors cursor-pointer"
           >
             <Sparkles size={13} />
             <span>AI Advice</span>
@@ -183,7 +183,7 @@ export const StorageMeterCard: React.FC<StorageMeterCardProps> = ({
           <button
             id="btn-meter-add-expense"
             onClick={onOpenAddExpense}
-            className="flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-semibold text-white bg-[#1A73E8] hover:bg-[#1557B0] transition-colors shadow-2xs cursor-pointer"
+            className="flex items-center gap-1 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-semibold text-white bg-[#1A73E8] hover:bg-[#1557B0] transition-colors shadow-2xs cursor-pointer"
           >
             <Plus size={13} strokeWidth={2.5} />
             <span>Add Spend</span>

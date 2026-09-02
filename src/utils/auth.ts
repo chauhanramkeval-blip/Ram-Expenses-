@@ -156,29 +156,34 @@ export function setStoredCurrentUser(user: UserAccount | null): void {
   }
 }
 
-export function getInitials(name: string): string {
-  if (!name) return "U";
-  const parts = name.trim().split(/\s+/);
+export function getInitials(name?: string | null): string {
+  if (!name || typeof name !== "string") return "U";
+  const trimmed = name.trim();
+  if (!trimmed) return "U";
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
   if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function getUserEffectivePin(user?: UserAccount): string {
+export function getUserEffectivePin(user?: UserAccount | null): string {
   if (!user) return "1234";
   return user.pin || "1234";
 }
 
-export function getUserEffectivePassword(user?: UserAccount): string {
+export function getUserEffectivePassword(user?: UserAccount | null): string {
   if (!user) return "khata";
   return user.password || "khata";
 }
 
-export function verifyUserPin(user: UserAccount, enteredPin: string): boolean {
+export function verifyUserPin(user?: UserAccount | null, enteredPin?: string): boolean {
+  if (!enteredPin) return false;
   const expectedPin = getUserEffectivePin(user);
   return enteredPin.trim() === expectedPin.trim();
 }
 
-export function verifyUserPassword(user: UserAccount, enteredPassword: string): boolean {
+export function verifyUserPassword(user?: UserAccount | null, enteredPassword?: string): boolean {
+  if (!enteredPassword) return false;
   const expectedPassword = getUserEffectivePassword(user);
   return (
     enteredPassword.trim().toLowerCase() === expectedPassword.trim().toLowerCase() ||

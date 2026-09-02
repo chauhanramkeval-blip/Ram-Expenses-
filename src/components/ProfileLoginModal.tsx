@@ -25,31 +25,53 @@ import {
   getUserEffectivePassword,
   verifyUserPin,
   verifyUserPassword,
+  DEFAULT_USERS,
 } from "../utils/auth";
 import { triggerBiometricAuthentication } from "../utils/biometrics";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 interface ProfileLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  targetUser: UserAccount | null;
-  allUsers: UserAccount[];
+  targetUser?: UserAccount | null;
+  allUsers?: UserAccount[];
   onAuthenticated: (user: UserAccount) => void;
   isSessionLockOnly?: boolean; // When true, locked for current user
 }
 
 type AuthMethod = "pin" | "password" | "google";
 
-export const ProfileLoginModal: React.FC<ProfileLoginModalProps> = ({
+export const ProfileLoginModal: React.FC<ProfileLoginModalProps> = (props) => {
+  if (!props.isOpen) return null;
+  return (
+    <ErrorBoundary fallbackTitle="Authentication Modal Error" fallbackMessage="Could not load PIN authentication screen.">
+      <ProfileLoginModalContent {...props} />
+    </ErrorBoundary>
+  );
+};
+
+const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
   isOpen,
   onClose,
   targetUser,
-  allUsers,
+  allUsers = [],
   onAuthenticated,
   isSessionLockOnly = false,
 }) => {
-  const [selectedUser, setSelectedUser] = useState<UserAccount>(
-    () => targetUser || allUsers[0]
-  );
+  const fallbackUser: UserAccount = targetUser || allUsers[0] || DEFAULT_USERS[0] || {
+    id: "user-ramkeval",
+    name: "Ramkeval Chauhan",
+    email: "chauhanramkeval@gmail.com",
+    avatarColor: "#1A73E8",
+    accountType: "Personal",
+    pin: "1234",
+    password: "khata",
+    joinedDate: "Today",
+    lastLogin: "Active",
+    authProvider: "pin",
+  };
+
+  const [selectedUser, setSelectedUser] = useState<UserAccount>(fallbackUser);
   const [authMethod, setAuthMethod] = useState<AuthMethod>("pin");
   const [pin, setPin] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -72,7 +94,7 @@ export const ProfileLoginModal: React.FC<ProfileLoginModalProps> = ({
   useEffect(() => {
     if (targetUser) {
       setSelectedUser(targetUser);
-    } else if (allUsers.length > 0) {
+    } else if (Array.isArray(allUsers) && allUsers.length > 0) {
       setSelectedUser(allUsers[0]);
     }
     setPin("");
@@ -98,7 +120,7 @@ export const ProfileLoginModal: React.FC<ProfileLoginModalProps> = ({
           }, 400);
         } else {
           setIsShaking(true);
-          setErrorMessage(`Incorrect 4-digit PIN for ${selectedUser.name}.`);
+          setErrorMessage(`Incorrect 4-digit PIN for ${selectedUser?.name || "User"}.`);
           setTimeout(() => {
             setPin("");
             setIsShaking(false);
@@ -238,7 +260,7 @@ export const ProfileLoginModal: React.FC<ProfileLoginModalProps> = ({
 
   if (!isOpen) return null;
 
-  const initials = getInitials(selectedUser.name);
+  const initials = getInitials(selectedUser?.name);
 
   return (
     <div
@@ -293,26 +315,26 @@ export const ProfileLoginModal: React.FC<ProfileLoginModalProps> = ({
             <div className="flex items-center gap-3 min-w-0">
               <div
                 className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-base font-bold shadow-xs shrink-0"
-                style={{ backgroundColor: selectedUser.avatarColor || "#1A73E8" }}
+                style={{ backgroundColor: selectedUser?.avatarColor || "#1A73E8" }}
               >
                 {initials}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h4 className="text-sm font-bold text-[#202124] truncate">{selectedUser.name}</h4>
+                  <h4 className="text-sm font-bold text-[#202124] truncate">{selectedUser?.name || "User"}</h4>
                   <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#E8F0FE] text-[#1A73E8] font-bold border border-[#D2E3FC] shrink-0">
-                    {selectedUser.accountType || "Personal"}
+                    {selectedUser?.accountType || "Personal"}
                   </span>
                 </div>
                 <p className="text-xs text-[#5F6368] truncate flex items-center gap-1">
                   <Mail size={12} className="text-[#80868B] shrink-0" />
-                  <span className="truncate">{selectedUser.email}</span>
+                  <span className="truncate">{selectedUser?.email || ""}</span>
                 </p>
               </div>
             </div>
 
             {/* Profile Dropdown Toggle if multiple accounts exist and not single session lock */}
-            {!isSessionLockOnly && allUsers.length > 1 && (
+            {!isSessionLockOnly && (allUsers?.length || 0) > 1 && (
               <button
                 type="button"
                 onClick={() => setShowUserDropdown(!showUserDropdown)}

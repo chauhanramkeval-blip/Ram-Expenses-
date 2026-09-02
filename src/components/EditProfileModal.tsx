@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { X, User, Mail, Phone, QrCode, Building2, Check, Palette, Lock, KeyRound } from "lucide-react";
 import { UserAccount } from "../types";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 interface EditProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: UserAccount;
+  currentUser?: UserAccount | null;
   onSaveProfile: (updated: UserAccount) => void;
+  onLogout?: () => void;
 }
 
 const AVATAR_COLORS = [
@@ -20,27 +22,36 @@ const AVATAR_COLORS = [
   "#202124", // Slate Dark
 ];
 
-export const EditProfileModal: React.FC<EditProfileModalProps> = ({
+export const EditProfileModal: React.FC<EditProfileModalProps> = (props) => {
+  if (!props.isOpen) return null;
+  return (
+    <ErrorBoundary fallbackTitle="Edit Profile Error" fallbackMessage="Unable to display edit profile modal.">
+      <EditProfileModalContent {...props} />
+    </ErrorBoundary>
+  );
+};
+
+const EditProfileModalContent: React.FC<EditProfileModalProps> = ({
   isOpen,
   onClose,
   currentUser,
   onSaveProfile,
 }) => {
-  const [name, setName] = useState(currentUser.name);
-  const [email, setEmail] = useState(currentUser.email);
-  const [phone, setPhone] = useState(currentUser.phone || "");
-  const [upiId, setUpiId] = useState(currentUser.upiId || "");
-  const [pin, setPin] = useState(currentUser.pin || "1234");
-  const [password, setPassword] = useState(currentUser.password || "khata");
+  const [name, setName] = useState(currentUser?.name || "");
+  const [email, setEmail] = useState(currentUser?.email || "");
+  const [phone, setPhone] = useState(currentUser?.phone || "");
+  const [upiId, setUpiId] = useState(currentUser?.upiId || "");
+  const [pin, setPin] = useState(currentUser?.pin || "1234");
+  const [password, setPassword] = useState(currentUser?.password || "khata");
   const [accountType, setAccountType] = useState<"Personal" | "Business / Shop" | "Household & Family">(
-    currentUser.accountType || "Personal"
+    currentUser?.accountType || "Personal"
   );
-  const [avatarColor, setAvatarColor] = useState(currentUser.avatarColor || "#1A73E8");
+  const [avatarColor, setAvatarColor] = useState(currentUser?.avatarColor || "#1A73E8");
 
   useEffect(() => {
-    if (isOpen) {
-      setName(currentUser.name);
-      setEmail(currentUser.email);
+    if (isOpen && currentUser) {
+      setName(currentUser.name || "");
+      setEmail(currentUser.email || "");
       setPhone(currentUser.phone || "");
       setUpiId(currentUser.upiId || "");
       setPin(currentUser.pin || "1234");
@@ -56,10 +67,17 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
 
+    const baseUser = currentUser || {
+      id: "user-" + Date.now(),
+      joinedDate: "Today",
+      lastLogin: "Active",
+      authProvider: "pin",
+    };
+
     const updated: UserAccount = {
-      ...currentUser,
+      ...baseUser,
       name: name.trim(),
-      email: email.trim(),
+      email: email.trim() || `${name.toLowerCase().replace(/\s+/g, "")}@khata.in`,
       phone: phone.trim(),
       upiId: upiId.trim(),
       pin: pin.trim() || "1234",
