@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Header } from "./components/Header";
+import { TransactionsView } from "./components/TransactionsView";
 import { StorageMeterCard } from "./components/StorageMeterCard";
 import { ExpenseList } from "./components/ExpenseList";
 import { IncomeView } from "./components/IncomeView";
@@ -131,7 +132,7 @@ export default function App() {
   });
 
   // UI States
-  const [activeTab, setActiveTab] = useState<"expenses" | "incomes" | "visuals" | "advisor">("expenses");
+  const [activeTab, setActiveTab] = useState<"transactions" | "expenses" | "incomes" | "visuals" | "advisor">("transactions");
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -890,58 +891,32 @@ export default function App() {
 
       {/* Main App Canvas */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-24 sm:pb-16 overflow-x-hidden">
-        {/* Tab 1: Daily Expenses View */}
-        {activeTab === "expenses" && (
-          <div className="animate-fadeIn">
-            {/* Storage / Budget Meter Card */}
-            <StorageMeterCard
-              expenses={currentMonthExpenses}
-              monthlyBudget={budget.monthlyBudget}
-              onOpenAddExpense={() => {
-                setEditingExpense(null);
-                setIsAddExpenseOpen(true);
-              }}
-              onOpenPdfReportModal={() => setIsPdfModalOpen(true)}
-              onNavigateToVisuals={() => setActiveTab("visuals")}
-              onNavigateToAdvisor={() => setActiveTab("advisor")}
-            />
-
-            {/* Expense Items grouped by date */}
-            <ExpenseList
-              expenses={expenses}
-              searchQuery={searchQuery}
-              onEditExpense={handleEditExpense}
-              onDeleteExpense={handleDeleteExpense}
-              onOpenAddExpense={() => {
-                setEditingExpense(null);
-                setIsAddExpenseOpen(true);
-              }}
-              onNavigateToVisuals={() => setActiveTab("visuals")}
-              customExpenseCategories={customExpenseCategories}
-              onOpenCategoryManager={() => handleOpenCategoryManager("expense")}
-            />
-          </div>
-        )}
-
-        {/* Tab 2: Income & Inflow Stream View */}
-        {activeTab === "incomes" && (
-          <div className="animate-fadeIn">
-            <IncomeView
-              incomes={incomes}
-              expenses={expenses}
-              monthlyBudget={budget.monthlyBudget}
-              searchQuery={searchQuery}
-              onOpenAddIncome={() => {
-                setEditingIncome(null);
-                setIsAddIncomeOpen(true);
-              }}
-              onEditIncome={handleEditIncome}
-              onDeleteIncome={handleDeleteIncome}
-              onNavigateToVisuals={() => setActiveTab("visuals")}
-              customIncomeCategories={customIncomeCategories}
-              onOpenCategoryManager={() => handleOpenCategoryManager("income")}
-            />
-          </div>
+        {/* Tab 1 & 2: Dedicated Transactions View (with Segmented Expenses & Income Tabs) */}
+        {(activeTab === "transactions" || activeTab === "expenses" || activeTab === "incomes") && (
+          <TransactionsView
+            expenses={expenses}
+            incomes={incomes}
+            budget={budget}
+            searchQuery={searchQuery}
+            initialSegment={activeTab === "incomes" ? "income" : "expenses"}
+            onEditExpense={handleEditExpense}
+            onDeleteExpense={handleDeleteExpense}
+            onOpenAddExpense={() => {
+              setEditingExpense(null);
+              setIsAddExpenseOpen(true);
+            }}
+            onEditIncome={handleEditIncome}
+            onDeleteIncome={handleDeleteIncome}
+            onOpenAddIncome={() => {
+              setEditingIncome(null);
+              setIsAddIncomeOpen(true);
+            }}
+            onNavigateToVisuals={() => setActiveTab("visuals")}
+            onNavigateToAdvisor={() => setActiveTab("advisor")}
+            customExpenseCategories={customExpenseCategories}
+            customIncomeCategories={customIncomeCategories}
+            onOpenCategoryManager={handleOpenCategoryManager}
+          />
         )}
 
         {/* Tab 3: Visualizations & Pie Chart */}

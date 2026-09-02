@@ -2,8 +2,8 @@ import React from "react";
 import { Plus, ListFilter, PieChart, Sparkles, Wallet, ArrowDownRight } from "lucide-react";
 
 interface BottomNavProps {
-  activeTab: "expenses" | "incomes" | "visuals" | "advisor";
-  onTabChange: (tab: "expenses" | "incomes" | "visuals" | "advisor") => void;
+  activeTab: "transactions" | "expenses" | "incomes" | "visuals" | "advisor";
+  onTabChange: (tab: "transactions" | "expenses" | "incomes" | "visuals" | "advisor") => void;
   onOpenAddExpense: () => void;
   onOpenAddIncome: () => void;
 }
@@ -47,20 +47,22 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         className="sm:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-[#E8EAED] px-2 py-1.5 flex items-center justify-around shadow-lg"
       >
         <button
-          id="mobile-nav-expenses"
-          onClick={() => onTabChange("expenses")}
+          id="mobile-nav-transactions"
+          onClick={() => onTabChange("transactions")}
           className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
-            activeTab === "expenses" ? "text-[#1A73E8] font-bold" : "text-[#5F6368]"
+            activeTab === "transactions" || activeTab === "expenses"
+              ? "text-[#1A73E8] font-bold"
+              : "text-[#5F6368]"
           }`}
         >
           <div
             className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-              activeTab === "expenses" ? "bg-[#E8F0FE]" : ""
+              activeTab === "transactions" || activeTab === "expenses" ? "bg-[#E8F0FE]" : ""
             }`}
           >
             <ListFilter size={16} />
           </div>
-          <span className="text-[10px]">Expenses</span>
+          <span className="text-[10px]">Transactions</span>
         </button>
 
         <button

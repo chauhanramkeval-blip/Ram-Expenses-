@@ -40,6 +40,139 @@ export const setStoredLastSyncTime = (timestamp: string, userId?: string) => {
 };
 
 /**
+ * Deeply sanitizes any object or array for Firestore:
+ * - Drops any keys with `undefined` values (which Firestore rejects)
+ * - Ensures plain serializable JS objects
+ */
+export function sanitizeForFirestore<T>(data: T): any {
+  if (data === null || data === undefined) {
+    return null;
+  }
+  if (typeof data !== "object") {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => sanitizeForFirestore(item));
+  }
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data as Record<string, any>)) {
+    if (value !== undefined) {
+      if (typeof value === "object" && value !== null) {
+        result[key] = sanitizeForFirestore(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Safely sanitizes and normalizes an Expense record for Firestore
+ */
+export const sanitizeExpense = (
+  exp: Partial<Expense>,
+  userId: string = "user-ramkeval"
+): Record<string, any> => {
+  const clean: Record<string, any> = {
+    id: exp.id || `exp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    title: exp.title ? String(exp.title).trim() : "Daily Spend",
+    amount: typeof exp.amount === "number" && !isNaN(exp.amount) ? exp.amount : 0,
+    category: exp.category || "Other Spends",
+    paymentMode: exp.paymentMode || "UPI",
+    date: exp.date || new Date().toISOString().split("T")[0],
+    userId: userId || exp.userId || "user-ramkeval",
+    syncedAt: new Date().toISOString(),
+  };
+
+  if (exp.time && String(exp.time).trim()) {
+    clean.time = String(exp.time).trim();
+  }
+  if (exp.merchantOrLocation && String(exp.merchantOrLocation).trim()) {
+    clean.merchantOrLocation = String(exp.merchantOrLocation).trim();
+  }
+  if (exp.notes && String(exp.notes).trim()) {
+    clean.notes = String(exp.notes).trim();
+  }
+  if (typeof exp.isRecurring === "boolean") {
+    clean.isRecurring = exp.isRecurring;
+  }
+
+  return sanitizeForFirestore(clean);
+};
+
+/**
+ * Safely sanitizes and normalizes an Income record for Firestore
+ */
+export const sanitizeIncome = (
+  inc: Partial<Income>,
+  userId: string = "user-ramkeval"
+): Record<string, any> => {
+  const clean: Record<string, any> = {
+    id: inc.id || `inc-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    title: inc.title ? String(inc.title).trim() : "Income Inflow",
+    amount: typeof inc.amount === "number" && !isNaN(inc.amount) ? inc.amount : 0,
+    category: inc.category || "Salary & Bonus",
+    paymentMode: inc.paymentMode || "UPI",
+    date: inc.date || new Date().toISOString().split("T")[0],
+    userId: userId || inc.userId || "user-ramkeval",
+    syncedAt: new Date().toISOString(),
+  };
+
+  if (inc.streamType) {
+    clean.streamType = inc.streamType;
+  }
+  if (inc.time && String(inc.time).trim()) {
+    clean.time = String(inc.time).trim();
+  }
+  if (inc.sourceOrClient && String(inc.sourceOrClient).trim()) {
+    clean.sourceOrClient = String(inc.sourceOrClient).trim();
+  }
+  if (inc.notes && String(inc.notes).trim()) {
+    clean.notes = String(inc.notes).trim();
+  }
+  if (typeof inc.isRecurring === "boolean") {
+    clean.isRecurring = inc.isRecurring;
+  }
+
+  return sanitizeForFirestore(clean);
+};
+
+/**
+ * Safely sanitizes and normalizes Budget settings for Firestore
+ */
+export const sanitizeBudget = (
+  budget: Partial<UserBudget>,
+  userId: string = "user-ramkeval"
+): Record<string, any> => {
+  const clean: Record<string, any> = {
+    userId: userId || "user-ramkeval",
+    monthlyBudget:
+      typeof budget.monthlyBudget === "number" && !isNaN(budget.monthlyBudget)
+        ? budget.monthlyBudget
+        : 25000,
+    targetSavingsPercent:
+      typeof budget.targetSavingsPercent === "number" && !isNaN(budget.targetSavingsPercent)
+        ? budget.targetSavingsPercent
+        : 20,
+    currency: budget.currency || "INR",
+    salaryDay:
+      typeof budget.salaryDay === "number" && !isNaN(budget.salaryDay)
+        ? budget.salaryDay
+        : 1,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (typeof budget.monthlyIncome === "number" && !isNaN(budget.monthlyIncome)) {
+    clean.monthlyIncome = budget.monthlyIncome;
+  }
+
+  return sanitizeForFirestore(clean);
+};
+
+/**
  * Saves a single expense to Firestore under the isolated path: users/{userId}/expenses/{expense.id}
  */
 export const syncExpenseToFirestore = async (
@@ -53,15 +186,8 @@ export const syncExpenseToFirestore = async (
 
   try {
     const expenseDocRef = doc(db, "users", userId, "expenses", expense.id);
-    await setDoc(
-      expenseDocRef,
-      {
-        ...expense,
-        userId,
-        syncedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    const sanitizedData = sanitizeExpense(expense, userId);
+    await setDoc(expenseDocRef, sanitizedData, { merge: true });
     setStoredLastSyncTime(new Date().toISOString(), userId);
     return true;
   } catch (err) {
@@ -107,15 +233,8 @@ export const syncIncomeToFirestore = async (
 
   try {
     const incomeDocRef = doc(db, "users", userId, "incomes", income.id);
-    await setDoc(
-      incomeDocRef,
-      {
-        ...income,
-        userId,
-        syncedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    const sanitizedData = sanitizeIncome(income, userId);
+    await setDoc(incomeDocRef, sanitizedData, { merge: true });
     setStoredLastSyncTime(new Date().toISOString(), userId);
     return true;
   } catch (err) {
@@ -161,15 +280,8 @@ export const syncBudgetToFirestore = async (
 
   try {
     const budgetDocRef = doc(db, "users", userId, "settings", "budget");
-    await setDoc(
-      budgetDocRef,
-      {
-        ...budget,
-        userId,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    const sanitizedData = sanitizeBudget(budget, userId);
+    await setDoc(budgetDocRef, sanitizedData, { merge: true });
     return true;
   } catch (err) {
     console.error(`Failed to sync budget for user ${userId} to Firestore:`, err);
@@ -265,6 +377,8 @@ export const subscribeToIncomesCollection = (
 
 /**
  * Full Manual Push / Backup: Uploads user's local expenses, incomes, and budget into Firestore
+ * Uses chunks of up to 400 operations per batch to safely stay below Firestore's 500 batch limit,
+ * with complete data sanitization against undefined values.
  */
 export const pushAllLocalDataToFirestore = async (
   expenses: Expense[],
@@ -283,32 +397,66 @@ export const pushAllLocalDataToFirestore = async (
   }
 
   try {
-    const batch = writeBatch(db);
     const nowIso = new Date().toISOString();
+    let syncedExpCount = 0;
+    let syncedIncCount = 0;
 
-    // Batch write user's expenses
+    // Collect all sanitized operations:
+    const operations: { ref: any; data: Record<string, any> }[] = [];
+
+    // 1. Prepare sanitized expenses
     for (const exp of expenses) {
-      const ref = doc(db, "users", userId, "expenses", exp.id);
-      batch.set(ref, { ...exp, userId, syncedAt: nowIso }, { merge: true });
+      if (!exp || !exp.id) continue;
+      try {
+        const ref = doc(db, "users", userId, "expenses", exp.id);
+        const cleanData = sanitizeExpense(exp, userId);
+        operations.push({ ref, data: cleanData });
+        syncedExpCount++;
+      } catch (err) {
+        console.warn(`Skipping malformed expense during backup:`, exp, err);
+      }
     }
 
-    // Batch write user's incomes
+    // 2. Prepare sanitized incomes
     for (const inc of incomes) {
-      const ref = doc(db, "users", userId, "incomes", inc.id);
-      batch.set(ref, { ...inc, userId, syncedAt: nowIso }, { merge: true });
+      if (!inc || !inc.id) continue;
+      try {
+        const ref = doc(db, "users", userId, "incomes", inc.id);
+        const cleanData = sanitizeIncome(inc, userId);
+        operations.push({ ref, data: cleanData });
+        syncedIncCount++;
+      } catch (err) {
+        console.warn(`Skipping malformed income during backup:`, inc, err);
+      }
     }
 
-    // Batch write user's budget settings
-    const budgetRef = doc(db, "users", userId, "settings", "budget");
-    batch.set(budgetRef, { ...budget, userId, updatedAt: nowIso }, { merge: true });
+    // 3. Prepare sanitized budget settings
+    try {
+      const budgetRef = doc(db, "users", userId, "settings", "budget");
+      const cleanBudget = sanitizeBudget(budget, userId);
+      operations.push({ ref: budgetRef, data: cleanBudget });
+    } catch (err) {
+      console.warn(`Skipping budget settings during backup:`, err);
+    }
 
-    await batch.commit();
+    // 4. Commit operations in batches of 400
+    const BATCH_SIZE = 400;
+    for (let i = 0; i < operations.length; i += BATCH_SIZE) {
+      const chunk = operations.slice(i, i + BATCH_SIZE);
+      const batch = writeBatch(db);
+      for (const op of chunk) {
+        batch.set(op.ref, op.data, { merge: true });
+      }
+      await batch.commit();
+    }
+
+    // Save timestamp locally
     setStoredLastSyncTime(nowIso, userId);
 
     return {
       success: true,
-      syncedExpenses: expenses.length,
-      syncedIncomes: incomes.length,
+      syncedExpenses: syncedExpCount,
+      syncedIncomes: syncedIncCount,
     };
   } catch (err: any) {
     console.error(`Failed to push data to Firestore for user ${userId}:`, err);

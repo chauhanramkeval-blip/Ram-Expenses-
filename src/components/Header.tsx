@@ -21,8 +21,8 @@ import { UserProfileMenu } from "./UserProfileMenu";
 interface HeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  activeTab: "expenses" | "incomes" | "visuals" | "advisor";
-  onTabChange: (tab: "expenses" | "incomes" | "visuals" | "advisor") => void;
+  activeTab: "transactions" | "expenses" | "incomes" | "visuals" | "advisor";
+  onTabChange: (tab: "transactions" | "expenses" | "incomes" | "visuals" | "advisor") => void;
   totalSpentThisMonth: number;
   totalIncomeThisMonth: number;
   monthlyBudget: number;
@@ -249,18 +249,20 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Navigation Tabs (Google Files / Material 3 style segmented pills) */}
         <div className="flex items-center gap-1.5 sm:gap-2 mt-2 sm:mt-3 overflow-x-auto no-scrollbar pb-1 w-full max-w-full">
           <button
-            id="tab-btn-expenses"
-            onClick={() => onTabChange("expenses")}
+            id="tab-btn-transactions"
+            onClick={() => onTabChange("transactions")}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === "expenses"
+              activeTab === "transactions" || activeTab === "expenses"
                 ? "bg-[#E8F0FE] text-[#1A73E8] shadow-2xs font-bold"
                 : "text-[#5F6368] hover:bg-[#F1F3F4] hover:text-[#202124]"
             }`}
           >
-            <span>📋 Daily Expenses</span>
+            <span>💳 Transactions</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                activeTab === "expenses" ? "bg-[#1A73E8] text-white" : "bg-[#E8EAED] text-[#5F6368]"
+                activeTab === "transactions" || activeTab === "expenses"
+                  ? "bg-[#1A73E8] text-white"
+                  : "bg-[#E8EAED] text-[#5F6368]"
               }`}
             >
               {formatINR(totalSpentThisMonth, true)}
@@ -276,7 +278,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : "text-[#5F6368] hover:bg-[#F1F3F4] hover:text-[#202124]"
             }`}
           >
-            <span>💰 Income & Inflow</span>
+            <span>💰 Income Stream</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full ${
                 activeTab === "incomes" ? "bg-[#0F9D58] text-white" : "bg-[#E6F4EA] text-[#0F9D58] font-bold"
