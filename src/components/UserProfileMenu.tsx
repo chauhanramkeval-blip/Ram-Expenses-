@@ -56,20 +56,25 @@ const UserProfileMenuContent: React.FC<UserProfileMenuProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Safe fallback current user
+  // Safe fallback current user using dynamic active user's actual profile name
   const safeUser: UserAccount = currentUser || {
     id: "user-default",
-    name: "Ramkeval Chauhan",
-    email: "chauhanramkeval@gmail.com",
-    phone: "+91 98765 43210",
-    upiId: "ramkeval@okhdfcbank",
+    name: "Your Name",
+    email: "",
+    phone: "",
+    upiId: "",
     avatarColor: "#1A73E8",
     accountType: "Personal",
     joinedDate: "Today",
     lastLogin: "Active",
-    authProvider: "google",
+    authProvider: "pin",
     pin: "1234",
   };
+
+  // Dynamic user display name with fallback to "Your Name"
+  const displayName = safeUser?.name?.trim() || "Your Name";
+  const initials = getInitials(displayName);
+  const firstName = displayName.split(/\s+/)[0] || "Your Name";
 
   // Close when pressing Escape key
   useEffect(() => {
@@ -87,8 +92,6 @@ const UserProfileMenuContent: React.FC<UserProfileMenuProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, showDeleteConfirm]);
 
-  const initials = getInitials(safeUser?.name || "User");
-  const firstName = (safeUser?.name || "User").trim().split(/\s+/)[0] || "User";
 
   const handleToggle = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -185,7 +188,7 @@ const UserProfileMenuContent: React.FC<UserProfileMenuProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <h4 className="text-base font-bold text-[#202124] truncate">
-                      {safeUser?.name || "User"}
+                      {displayName}
                     </h4>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#E8F0FE] text-[#1A73E8] font-bold border border-[#D2E3FC] shrink-0">
                       {safeUser?.accountType || "Personal"}

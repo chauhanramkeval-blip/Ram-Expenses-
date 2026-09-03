@@ -36,10 +36,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   onRegisterUser,
 }) => {
   const [authMode, setAuthMode] = useState<AuthMode>("quick_profiles");
-  const [email, setEmail] = useState(currentUser.email || "chauhanramkeval@gmail.com");
-  const [password, setPassword] = useState("khata123");
+  const [email, setEmail] = useState(currentUser?.email || "");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("9876543210");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState(["", "", "", "", "", ""]);
   const [otpCountdown, setOtpCountdown] = useState(30);
@@ -69,10 +69,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setErrorMessage("");
     const targetUser = userToLogin || allUsers[0] || {
       id: "user-google-" + Date.now(),
-      name: "Ramkeval Chauhan",
-      email: "chauhanramkeval@gmail.com",
+      name: "Your Name",
+      email: "user@gmail.com",
       phone: "+91 98765 43210",
-      upiId: "ramkeval@okhdfcbank",
+      upiId: "user@okhdfcbank",
       avatarColor: "#1A73E8",
       accountType: "Personal",
       joinedDate: "Aug 2024",
@@ -407,7 +407,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. chauhanramkeval@gmail.com"
+                    placeholder="e.g. yourname@gmail.com"
                     className="w-full pl-10 pr-3 py-2.5 text-xs sm:text-sm bg-[#F8F9FA] focus:bg-white text-[#202124] rounded-2xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none"
                   />
                 </div>

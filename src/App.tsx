@@ -899,6 +899,7 @@ export default function App() {
             budget={budget}
             searchQuery={searchQuery}
             initialSegment={activeTab === "incomes" ? "income" : "expenses"}
+            currentUser={currentUser}
             onEditExpense={handleEditExpense}
             onDeleteExpense={handleDeleteExpense}
             onOpenAddExpense={() => {
@@ -916,6 +917,7 @@ export default function App() {
             customExpenseCategories={customExpenseCategories}
             customIncomeCategories={customIncomeCategories}
             onOpenCategoryManager={handleOpenCategoryManager}
+            onOpenExportModal={() => setIsExportModalOpen(true)}
           />
         )}
 
@@ -1005,6 +1007,7 @@ export default function App() {
         onClose={() => setIsExportModalOpen(false)}
         expenses={expenses}
         filteredExpenses={expenses}
+        currentUser={currentUser}
         onOpenBackupModal={() => setIsBackupModalOpen(true)}
       />
 

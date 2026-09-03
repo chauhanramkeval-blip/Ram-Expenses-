@@ -58,10 +58,10 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
   onAuthenticated,
   isSessionLockOnly = false,
 }) => {
-  const fallbackUser: UserAccount = targetUser || allUsers[0] || DEFAULT_USERS[0] || {
-    id: "user-ramkeval",
-    name: "Ramkeval Chauhan",
-    email: "chauhanramkeval@gmail.com",
+  const fallbackUser: UserAccount = targetUser || allUsers[0] || {
+    id: "user-default",
+    name: "Your Name",
+    email: "",
     avatarColor: "#1A73E8",
     accountType: "Personal",
     pin: "1234",

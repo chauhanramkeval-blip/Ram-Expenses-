@@ -336,7 +336,11 @@ export const DatePeriodFilter: React.FC<DatePeriodFilterProps> = ({
       {/* ============================================================ */}
       <div
         id="date-range-period-bar"
-        className="flex items-center gap-2 bg-[#1E1F24] border border-[#32353B] rounded-2xl p-1.5 shadow-md transition-all hover:border-[#4E525C]"
+        className="flex items-center gap-1.5 sm:gap-2 bg-[#1E1F24] border border-[#32353B] rounded-2xl p-1.5 shadow-md transition-all hover:border-[#4E525C] overflow-x-auto no-scrollbar max-w-full touch-pan-x"
+        style={{
+          scrollbarWidth: "none",
+          WebkitOverflowScrolling: "touch",
+        }}
       >
         {/* Left Side: Date Display with Calendar Icons (DD/MM/YY 📅 ~ DD/MM/YY 📅) */}
         <button
@@ -347,12 +351,12 @@ export const DatePeriodFilter: React.FC<DatePeriodFilterProps> = ({
             setIsCalendarMode(false);
           }}
           title="Click to change date period or range"
-          className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 bg-[#2B2D33] hover:bg-[#353840] text-[#F8F9FA] rounded-xl text-xs font-semibold tracking-wide border border-[#3E424B] transition-colors cursor-pointer group"
+          className="shrink-0 flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-[#2B2D33] hover:bg-[#353840] text-[#F8F9FA] rounded-xl text-xs font-semibold tracking-wide border border-[#3E424B] transition-colors cursor-pointer group"
         >
           {/* Start Date */}
           <span className="flex items-center gap-1 text-[#E8EAED] group-hover:text-white">
-            <span className="font-mono">{formattedStart}</span>
-            <span className="text-[13px]" role="img" aria-label="start calendar">
+            <span className="font-mono text-[11px] sm:text-xs">{formattedStart}</span>
+            <span className="text-[12px] sm:text-[13px]" role="img" aria-label="start calendar">
               📅
             </span>
           </span>
@@ -362,8 +366,8 @@ export const DatePeriodFilter: React.FC<DatePeriodFilterProps> = ({
 
           {/* End Date */}
           <span className="flex items-center gap-1 text-[#E8EAED] group-hover:text-white">
-            <span className="font-mono">{formattedEnd}</span>
-            <span className="text-[13px]" role="img" aria-label="end calendar">
+            <span className="font-mono text-[11px] sm:text-xs">{formattedEnd}</span>
+            <span className="text-[12px] sm:text-[13px]" role="img" aria-label="end calendar">
               📅
             </span>
           </span>
@@ -378,7 +382,7 @@ export const DatePeriodFilter: React.FC<DatePeriodFilterProps> = ({
             setIsCalendarMode(false);
           }}
           aria-expanded={isOpen}
-          className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+          className={`shrink-0 flex-shrink-0 flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
             isOpen
               ? "bg-[#388BFD] text-white border-[#388BFD] shadow-sm"
               : "bg-[#2B2D33] hover:bg-[#353840] text-[#F1F3F4] border-[#3E424B]"

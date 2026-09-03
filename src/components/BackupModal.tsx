@@ -50,7 +50,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   onRestoreBackup,
 }) => {
   const [activeTab, setActiveTab] = useState<"email_backup" | "json_file" | "restore">("email_backup");
-  const [recipientEmail, setRecipientEmail] = useState(currentUser.email || "chauhanramkeval@gmail.com");
+  const [recipientEmail, setRecipientEmail] = useState(currentUser?.email || "");
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [copiedJson, setCopiedJson] = useState(false);
   const [restoreStatus, setRestoreStatus] = useState<{ type: "success" | "error" | ""; message: string }>({
@@ -87,7 +87,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
 
   // Handle Send Email
   const handleSendEmail = () => {
-    openEmailBackupClient(backupData, recipientEmail || "chauhanramkeval@gmail.com");
+    openEmailBackupClient(backupData, recipientEmail || currentUser?.email || "user@example.com");
   };
 
   // Handle Download JSON
@@ -272,7 +272,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                     type="email"
                     value={recipientEmail}
                     onChange={(e) => setRecipientEmail(e.target.value)}
-                    placeholder="chauhanramkeval@gmail.com"
+                    placeholder="e.g. user@example.com"
                     className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-[#F8F9FA] focus:bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none"
                   />
                 </div>

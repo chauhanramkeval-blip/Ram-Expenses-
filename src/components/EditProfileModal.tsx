@@ -162,7 +162,7 @@ const EditProfileModalContent: React.FC<EditProfileModalProps> = ({
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Ramkeval Chauhan"
+                placeholder="e.g. Rahul Sharma"
                 className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-[#F8F9FA] focus:bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none"
               />
             </div>
@@ -181,7 +181,7 @@ const EditProfileModalContent: React.FC<EditProfileModalProps> = ({
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="chauhanramkeval@gmail.com"
+                placeholder="e.g. rahul@example.com"
                 className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-[#F8F9FA] focus:bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none"
               />
             </div>

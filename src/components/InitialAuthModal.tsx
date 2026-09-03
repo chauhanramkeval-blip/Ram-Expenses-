@@ -51,16 +51,16 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
   const [mode, setMode] = useState<"signup" | "login">(initialMode);
 
   // Sign Up Form State
-  const [name, setName] = useState("Ramkeval Chauhan");
+  const [name, setName] = useState("");
   const [accountType, setAccountType] = useState<
     "Personal" | "Business / Shop" | "Household & Family"
   >("Personal");
-  const [email, setEmail] = useState("chauhanramkeval@gmail.com");
-  const [phone, setPhone] = useState("+91 98765 43210");
-  const [upiId, setUpiId] = useState("ramkeval@okhdfcbank");
-  const [pin, setPin] = useState("1234");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [upiId, setUpiId] = useState("");
+  const [pin, setPin] = useState("");
   const [showSignupPin, setShowSignupPin] = useState(false);
-  const [password, setPassword] = useState("khata123");
+  const [password, setPassword] = useState("");
 
   // Log In Form State
   const [selectedLoginUser, setSelectedLoginUser] = useState<UserAccount>(
@@ -269,10 +269,10 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
   const handleGoogleInstantAuth = () => {
     const googleUser: UserAccount = {
       id: "user-google-" + Date.now(),
-      name: name || "Ramkeval Chauhan",
-      email: email || "chauhanramkeval@gmail.com",
-      phone: phone || "+91 98765 43210",
-      upiId: upiId || "ramkeval@okhdfcbank",
+      name: name.trim() || "Your Name",
+      email: email.trim() || "user@gmail.com",
+      phone: phone.trim() || "+91 98765 43210",
+      upiId: upiId.trim() || "user@okhdfcbank",
       avatarColor: "#1A73E8",
       accountType: accountType || "Personal",
       joinedDate: "Today",
@@ -361,7 +361,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Ramkeval Chauhan"
+                  placeholder="e.g. Rahul Sharma"
                   className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/20 outline-none transition-all"
                 />
               </div>

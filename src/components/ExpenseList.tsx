@@ -128,11 +128,22 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   return (
     <div id="khata-expense-list-container" className="space-y-4">
       {/* Category Filter Chips Carousel (Google Files style) */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1.5 pt-0.5">
+      <div
+        className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1.5 pt-0.5 touch-pan-x"
+        style={{
+          display: "flex",
+          gap: "8px",
+          overflowX: "auto",
+          whiteSpace: "nowrap",
+          scrollbarWidth: "none",
+          WebkitOverflowScrolling: "touch",
+          padding: "4px 2px",
+        }}
+      >
         <button
           id="chip-cat-all"
           onClick={() => setSelectedCategory("ALL")}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border ${
+          className={`shrink-0 flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border ${
             selectedCategory === "ALL"
               ? "bg-[#202124] text-white border-[#202124]"
               : "bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F1F3F4]"
@@ -148,7 +159,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
               key={cat.id}
               id={`chip-cat-${cat.id.replace(/\s+/g, "-").toLowerCase()}`}
               onClick={() => setSelectedCategory(isSelected ? "ALL" : cat.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer border ${
+              className={`shrink-0 flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer border ${
                 isSelected
                   ? "shadow-2xs font-bold"
                   : "bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F8F9FA]"
@@ -180,7 +191,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           <button
             type="button"
             onClick={onOpenCategoryManager}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] border border-[#D2E3FC] transition-colors cursor-pointer"
+            className="shrink-0 flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] border border-[#D2E3FC] transition-colors cursor-pointer"
           >
             <Settings size={12} />
             <span>Edit Categories</span>

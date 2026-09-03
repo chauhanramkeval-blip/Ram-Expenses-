@@ -1,13 +1,15 @@
 import React, { useState } from "react";
 import { X, FileSpreadsheet, Download, Check, FileText, Mail } from "lucide-react";
-import { Expense } from "../types";
+import { Expense, UserAccount } from "../types";
 import { formatINR } from "../utils/formatters";
+import { exportTransactionsToExcel } from "../utils/export";
 
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   expenses: Expense[];
   filteredExpenses: Expense[];
+  currentUser?: UserAccount | null;
   onOpenBackupModal?: () => void;
 }
 
@@ -16,6 +18,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   onClose,
   expenses,
   filteredExpenses,
+  currentUser,
   onOpenBackupModal,
 }) => {
   const [exportScope, setExportScope] = useState<"all" | "filtered" | "current-month">("all");
@@ -35,41 +38,40 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     return expenses;
   };
 
-  const generateCSV = () => {
-    const data = getExportData();
-    const headers = ["ID", "Date", "Title", "Amount (INR)", "Category", "Payment Mode", "Merchant / Vendor", "Notes", "Synced At"];
-    
-    const rows = data.map((e) => [
-      `"${e.id}"`,
-      `"${e.date}"`,
-      `"${(e.title || "").replace(/"/g, '""')}"`,
-      e.amount,
-      `"${e.category}"`,
-      `"${e.paymentMode}"`,
-      `"${(e.merchantOrLocation || "").replace(/"/g, '""')}"`,
-      `"${(e.notes || "").replace(/"/g, '""')}"`,
-      `"${e.syncedAt || ""}"`,
-    ]);
-
-    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    return csvContent;
-  };
-
   const handleDownloadCSV = () => {
-    const csvContent = generateCSV();
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    const dateStr = new Date().toISOString().split("T")[0];
-    link.setAttribute("download", `Khata_Expenses_Export_${exportScope}_${dateStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const data = getExportData();
+    exportTransactionsToExcel({
+      expenses: data,
+      user: currentUser,
+      segment: "expenses",
+    });
   };
 
   const handleCopyClipboard = () => {
-    const csvContent = generateCSV();
+    const data = getExportData();
+    const headers = [
+      "Date",
+      "Time",
+      "Type (Expense/Income)",
+      "Category",
+      "Title/Description",
+      "Payment Method",
+      "Amount (₹)",
+      "Notes",
+    ];
+
+    const rows = data.map((e) => [
+      `"${e.date.split("T")[0]}"`,
+      `"12:00 PM"`,
+      `"Expense"`,
+      `"${e.category}"`,
+      `"${(e.title || "").replace(/"/g, '""')}"`,
+      `"${e.paymentMode}"`,
+      e.amount,
+      `"${(e.notes || e.merchantOrLocation || "").replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     navigator.clipboard.writeText(csvContent);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -95,13 +97,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <FileSpreadsheet size={18} />
             </div>
             <div>
-              <h3 className="font-bold text-base text-[#202124]">Export to CSV</h3>
+              <h3 className="font-bold text-base text-[#202124]">Export to Excel / CSV</h3>
               <p className="text-xs text-[#5F6368]">Download spreadsheet for Excel or Google Sheets</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-[#5F6368] hover:text-[#202124] hover:bg-[#F1F3F4] rounded-full transition-colors"
+            className="p-1.5 text-[#5F6368] hover:text-[#202124] hover:bg-[#F1F3F4] rounded-full transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -116,7 +118,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <button
                 type="button"
                 onClick={() => setExportScope("all")}
-                className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${
+                className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                   exportScope === "all"
                     ? "bg-[#E8F0FE] text-[#1A73E8] border-[#1A73E8]"
                     : "bg-[#F8F9FA] text-[#3C4043] border-[#DADCE0] hover:bg-[#F1F3F4]"
@@ -127,7 +129,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <button
                 type="button"
                 onClick={() => setExportScope("current-month")}
-                className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${
+                className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                   exportScope === "current-month"
                     ? "bg-[#E8F0FE] text-[#1A73E8] border-[#1A73E8]"
                     : "bg-[#F8F9FA] text-[#3C4043] border-[#DADCE0] hover:bg-[#F1F3F4]"
@@ -138,7 +140,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <button
                 type="button"
                 onClick={() => setExportScope("filtered")}
-                className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${
+                className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                   exportScope === "filtered"
                     ? "bg-[#E8F0FE] text-[#1A73E8] border-[#1A73E8]"
                     : "bg-[#F8F9FA] text-[#3C4043] border-[#DADCE0] hover:bg-[#F1F3F4]"
@@ -149,18 +151,24 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </div>
           </div>
 
-          <div className="bg-[#F8F9FA] p-3.5 rounded-2xl border border-[#E8EAED] text-xs space-y-1">
+          <div className="bg-[#F8F9FA] p-3.5 rounded-2xl border border-[#E8EAED] text-xs space-y-1.5">
+            <div className="flex justify-between text-[#5F6368]">
+              <span>User Profile:</span>
+              <span className="font-bold text-[#202124]">{currentUser?.name || "Your Name"}</span>
+            </div>
             <div className="flex justify-between text-[#5F6368]">
               <span>Selected Records:</span>
               <span className="font-bold text-[#202124]">{currentDataset.length} items</span>
             </div>
             <div className="flex justify-between text-[#5F6368]">
-              <span>Total Spend Value:</span>
-              <span className="font-bold text-[#1A73E8]">{formatINR(datasetSum)}</span>
+              <span>Total Value:</span>
+              <span className="font-bold text-[#137333]">{formatINR(datasetSum)}</span>
             </div>
             <div className="flex justify-between text-[#5F6368]">
-              <span>Fields Included:</span>
-              <span className="font-mono text-[10px]">Date, Title, Amount, Category, UPI/Cash, Notes</span>
+              <span>Columns:</span>
+              <span className="font-mono text-[10px] text-[#5F6368]">
+                Date | Time | Type | Category | Title | Payment | Amount | Notes
+              </span>
             </div>
           </div>
 
@@ -179,7 +187,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               className="flex-1 py-2.5 rounded-full text-xs font-bold bg-[#137333] hover:bg-[#0D652D] text-white transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Download size={14} />
-              <span>Download .CSV</span>
+              <span>Export to Excel</span>
             </button>
           </div>
 

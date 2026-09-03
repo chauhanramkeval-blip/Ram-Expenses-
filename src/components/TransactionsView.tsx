@@ -15,6 +15,10 @@ import {
   CheckCircle2,
   Repeat,
   ArrowRight,
+  FileSpreadsheet,
+  Download,
+  Check,
+  Sparkles,
 } from "lucide-react";
 import {
   Expense,
@@ -22,10 +26,12 @@ import {
   UserBudget,
   CategoryMeta,
   IncomeCategoryMeta,
+  UserAccount,
 } from "../types";
 import { CategoryIcon, IncomeIcon, resolveExpenseMeta, resolveIncomeMeta } from "./CategoryIcon";
 import { CATEGORY_LIST, INCOME_CATEGORY_LIST } from "../data/categories";
 import { formatINR, formatFriendlyDate } from "../utils/formatters";
+import { exportTransactionsToExcel } from "../utils/export";
 
 export interface TransactionsViewProps {
   expenses: Expense[];
@@ -33,6 +39,7 @@ export interface TransactionsViewProps {
   budget: UserBudget;
   searchQuery: string;
   initialSegment?: "expenses" | "income";
+  currentUser?: UserAccount | null;
   onEditExpense: (expense: Expense) => void;
   onDeleteExpense: (id: string) => void;
   onOpenAddExpense: () => void;
@@ -44,6 +51,7 @@ export interface TransactionsViewProps {
   customExpenseCategories?: CategoryMeta[];
   customIncomeCategories?: IncomeCategoryMeta[];
   onOpenCategoryManager?: (tab: "expense" | "income") => void;
+  onOpenExportModal?: () => void;
 }
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({
@@ -52,6 +60,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   budget,
   searchQuery: externalSearchQuery,
   initialSegment = "expenses",
+  currentUser,
   onEditExpense,
   onDeleteExpense,
   onOpenAddExpense,
@@ -63,13 +72,21 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   customExpenseCategories,
   customIncomeCategories,
   onOpenCategoryManager,
+  onOpenExportModal,
 }) => {
   // Segmented tab state: "expenses" (Red) vs "income" (Green)
   const [activeSegment, setActiveSegment] = useState<"expenses" | "income">(initialSegment);
 
+  // Toast notification for instant file downloads
+  const [exportToast, setExportToast] = useState<{
+    show: boolean;
+    message: string;
+    filename: string;
+  } | null>(null);
+
   // Month / Date Range State
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const [dateFilterMode, setDateFilterMode] = useState<"month" | "all" | "today" | "week">("month");
+  const [dateFilterMode, setDateFilterMode] = useState<"today" | "week" | "month" | "year" | "all">("month");
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
 
   // Internal search / filter state
@@ -114,13 +131,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return false;
 
-    if (dateFilterMode === "month") {
-      return (
-        d.getMonth() === currentDate.getMonth() &&
-        d.getFullYear() === currentDate.getFullYear()
-      );
-    }
-
     if (dateFilterMode === "today") {
       const today = new Date();
       return (
@@ -142,6 +152,17 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       sunday.setHours(23, 59, 59, 999);
 
       return d >= monday && d <= sunday;
+    }
+
+    if (dateFilterMode === "month") {
+      return (
+        d.getMonth() === currentDate.getMonth() &&
+        d.getFullYear() === currentDate.getFullYear()
+      );
+    }
+
+    if (dateFilterMode === "year") {
+      return d.getFullYear() === currentDate.getFullYear();
     }
 
     return true;
@@ -295,6 +316,32 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const allExpenseCats = customExpenseCategories || CATEGORY_LIST;
   const allIncomeCats = customIncomeCategories || INCOME_CATEGORY_LIST;
 
+  // Active user's profile display name
+  const userDisplayName = currentUser?.name?.trim() || "Your Name";
+
+  // Handle Export to Excel / CSV with UTF-8 BOM
+  const handleExportExcel = () => {
+    const dataExpenses = activeSegment === "expenses" ? filteredExpenses : expenses;
+    const dataIncomes = activeSegment === "income" ? filteredIncomes : incomes;
+
+    const result = exportTransactionsToExcel({
+      expenses: dataExpenses,
+      incomes: dataIncomes,
+      user: currentUser,
+      segment: activeSegment,
+    });
+
+    setExportToast({
+      show: true,
+      message: `Exported ${result.count} ${activeSegment === "expenses" ? "expenses" : "income transactions"} to Excel!`,
+      filename: result.filename,
+    });
+
+    setTimeout(() => {
+      setExportToast(null);
+    }, 4500);
+  };
+
   return (
     <div id="transactions-view" className="space-y-4 sm:space-y-6 pb-20 sm:pb-8 animate-fadeIn">
       {/* 1. SEGMENTED CONTROL TABS (Expenses vs Income) */}
@@ -370,7 +417,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               type="button"
               id="btn-transactions-date-selector"
               onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-[#F8F9FA] hover:bg-[#E8EAED] text-[#202124] text-xs font-semibold rounded-2xl border border-[#DADCE0] transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#F8F9FA] hover:bg-[#E8EAED] text-[#202124] text-xs font-semibold rounded-2xl border border-[#DADCE0] transition-colors cursor-pointer shrink-0"
             >
               <Calendar size={14} className="text-[#1A73E8]" />
               <span>
@@ -380,6 +427,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                   ? "Today"
                   : dateFilterMode === "week"
                   ? "This Week"
+                  : dateFilterMode === "year"
+                  ? `Year ${currentDate.getFullYear()}`
                   : "All Records"}
               </span>
               <ChevronDown size={14} className="text-[#5F6368]" />
@@ -459,6 +508,22 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        setDateFilterMode("year");
+                        setIsDateDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-medium flex items-center justify-between cursor-pointer ${
+                        dateFilterMode === "year"
+                          ? "bg-[#E8F0FE] text-[#1A73E8] font-bold"
+                          : "hover:bg-[#F1F3F4] text-[#202124]"
+                      }`}
+                    >
+                      <span>This Year ({currentDate.getFullYear()})</span>
+                      {dateFilterMode === "year" && <CheckCircle2 size={14} />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
                         setDateFilterMode("all");
                         setIsDateDropdownOpen(false);
                       }}
@@ -468,7 +533,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                           : "hover:bg-[#F1F3F4] text-[#202124]"
                       }`}
                     >
-                      <span>All Time</span>
+                      <span>All Records</span>
                       {dateFilterMode === "all" && <CheckCircle2 size={14} />}
                     </button>
                   </div>
@@ -500,13 +565,26 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             )}
           </div>
 
+          {/* Export to Excel Button */}
+          <button
+            type="button"
+            id="btn-export-excel-top"
+            onClick={handleExportExcel}
+            title={`Export ${activeSegment === "expenses" ? "Expenses" : "Income"} to Excel spreadsheet (.csv)`}
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#E6F4EA] hover:bg-[#CEEAD6] text-[#137333] border border-[#CEEAD6] rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
+          >
+            <FileSpreadsheet size={15} className="text-[#137333]" />
+            <span className="hidden sm:inline">Export to Excel</span>
+            <span className="sm:hidden">Excel</span>
+          </button>
+
           {/* Primary Quick Action Button */}
           {activeSegment === "expenses" ? (
             <button
               type="button"
               id="btn-add-expense-top"
               onClick={onOpenAddExpense}
-              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-[#EA4335] hover:bg-[#D93025] active:scale-98 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-[#EA4335] hover:bg-[#D93025] active:scale-98 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all cursor-pointer shrink-0"
             >
               <Plus size={16} strokeWidth={2.5} />
               <span>Add Expense</span>
@@ -516,13 +594,110 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               type="button"
               id="btn-add-income-top"
               onClick={onOpenAddIncome}
-              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-[#0F9D58] hover:bg-[#0B8043] active:scale-98 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 bg-[#0F9D58] hover:bg-[#0B8043] active:scale-98 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all cursor-pointer shrink-0"
             >
               <Plus size={16} strokeWidth={2.5} />
               <span>Add Income</span>
             </button>
           )}
         </div>
+      </div>
+
+      {/* TIME PERIOD FILTER BAR (Horizontal swipeable carousel on mobile) */}
+      <div
+        id="time-period-filter-bar"
+        className="flex items-center gap-2 overflow-x-auto whitespace-nowrap no-scrollbar py-1 px-0.5 max-w-full touch-pan-x"
+        style={{
+          display: "flex",
+          gap: "8px",
+          overflowX: "auto",
+          whiteSpace: "nowrap",
+          scrollbarWidth: "none",
+          WebkitOverflowScrolling: "touch",
+          padding: "4px 2px",
+        }}
+      >
+        <button
+          type="button"
+          id="filter-period-today"
+          onClick={() => setDateFilterMode("today")}
+          className={`shrink-0 flex-shrink-0 px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
+            dateFilterMode === "today"
+              ? activeSegment === "expenses"
+                ? "bg-[#EA4335] text-white border-[#EA4335] shadow-xs"
+                : "bg-[#0F9D58] text-white border-[#0F9D58] shadow-xs"
+              : "bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F1F3F4] hover:text-[#202124]"
+          }`}
+        >
+          <span>Today</span>
+        </button>
+
+        <button
+          type="button"
+          id="filter-period-week"
+          onClick={() => setDateFilterMode("week")}
+          className={`shrink-0 flex-shrink-0 px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
+            dateFilterMode === "week"
+              ? activeSegment === "expenses"
+                ? "bg-[#EA4335] text-white border-[#EA4335] shadow-xs"
+                : "bg-[#0F9D58] text-white border-[#0F9D58] shadow-xs"
+              : "bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F1F3F4] hover:text-[#202124]"
+          }`}
+        >
+          <span className="sm:hidden">Week</span>
+          <span className="hidden sm:inline">This Week</span>
+        </button>
+
+        <button
+          type="button"
+          id="filter-period-month"
+          onClick={() => {
+            handleCurrentMonth();
+            setDateFilterMode("month");
+          }}
+          className={`shrink-0 flex-shrink-0 px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
+            dateFilterMode === "month"
+              ? activeSegment === "expenses"
+                ? "bg-[#EA4335] text-white border-[#EA4335] shadow-xs"
+                : "bg-[#0F9D58] text-white border-[#0F9D58] shadow-xs"
+              : "bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F1F3F4] hover:text-[#202124]"
+          }`}
+        >
+          <span className="sm:hidden">Month</span>
+          <span className="hidden sm:inline">This Month</span>
+        </button>
+
+        <button
+          type="button"
+          id="filter-period-year"
+          onClick={() => setDateFilterMode("year")}
+          className={`shrink-0 flex-shrink-0 px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
+            dateFilterMode === "year"
+              ? activeSegment === "expenses"
+                ? "bg-[#EA4335] text-white border-[#EA4335] shadow-xs"
+                : "bg-[#0F9D58] text-white border-[#0F9D58] shadow-xs"
+              : "bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F1F3F4] hover:text-[#202124]"
+          }`}
+        >
+          <span className="sm:hidden">Year</span>
+          <span className="hidden sm:inline">This Year</span>
+        </button>
+
+        <button
+          type="button"
+          id="filter-period-all"
+          onClick={() => setDateFilterMode("all")}
+          className={`shrink-0 flex-shrink-0 px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
+            dateFilterMode === "all"
+              ? activeSegment === "expenses"
+                ? "bg-[#EA4335] text-white border-[#EA4335] shadow-xs"
+                : "bg-[#0F9D58] text-white border-[#0F9D58] shadow-xs"
+              : "bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F1F3F4] hover:text-[#202124]"
+          }`}
+        >
+          <span className="sm:hidden">All</span>
+          <span className="hidden sm:inline">All Records</span>
+        </button>
       </div>
 
       {/* 2. DYNAMIC SUMMARY HEADER CARD */}
@@ -552,6 +727,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     ? "Today"
                     : dateFilterMode === "week"
                     ? "This Week"
+                    : dateFilterMode === "year"
+                    ? `This Year (${currentDate.getFullYear()})`
                     : "All Time"}
                 </span>
               </span>
@@ -574,7 +751,9 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             </div>
 
             {/* Contextual Stats subtitle */}
-            <p className="text-xs text-[#5F6368]">
+            <p className="text-xs text-[#5F6368] flex items-center gap-1.5 flex-wrap">
+              <span className="font-bold text-[#202124]">{userDisplayName}</span>
+              <span>•</span>
               {activeSegment === "expenses" ? (
                 <>
                   Budget: <strong className="text-[#202124]">{formatINR(monthlyLimit)}</strong> (
@@ -592,27 +771,40 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             </p>
           </div>
 
-          {/* Quick Month Navigator Controls */}
-          <div className="flex items-center gap-2 self-start md:self-center bg-[#F8F9FA] p-1.5 rounded-2xl border border-[#E8EAED]">
+          {/* Quick Month Navigator & Excel Export Shortcut */}
+          <div className="flex items-center gap-2 self-start md:self-center">
             <button
               type="button"
-              onClick={handlePrevMonth}
-              title="Previous Month"
-              className="p-1.5 hover:bg-white rounded-xl text-[#5F6368] hover:text-[#202124] transition-colors cursor-pointer"
+              id="btn-export-excel-summary"
+              onClick={handleExportExcel}
+              title={`Export ${activeSegment === "expenses" ? "Expenses" : "Income"} to Excel`}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E6F4EA] hover:bg-[#CEEAD6] text-[#137333] border border-[#CEEAD6] rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
             >
-              <ChevronLeft size={16} />
+              <Download size={13} />
+              <span>Export</span>
             </button>
-            <span className="text-xs font-bold text-[#202124] px-2 whitespace-nowrap">
-              {currentMonthLabel}
-            </span>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              title="Next Month"
-              className="p-1.5 hover:bg-white rounded-xl text-[#5F6368] hover:text-[#202124] transition-colors cursor-pointer"
-            >
-              <ChevronRight size={16} />
-            </button>
+
+            <div className="flex items-center gap-1 bg-[#F8F9FA] p-1 rounded-2xl border border-[#E8EAED]">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                title="Previous Month"
+                className="p-1 hover:bg-white rounded-xl text-[#5F6368] hover:text-[#202124] transition-colors cursor-pointer"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-xs font-bold text-[#202124] px-1.5 whitespace-nowrap">
+                {currentMonthLabel}
+              </span>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                title="Next Month"
+                className="p-1 hover:bg-white rounded-xl text-[#5F6368] hover:text-[#202124] transition-colors cursor-pointer"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -662,11 +854,21 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       {/* 3. FILTERS & SEARCH ROW */}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         {/* Category Pills Slider / Filter */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
+        <div
+          className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar touch-pan-x"
+          style={{
+            display: "flex",
+            overflowX: "auto",
+            whiteSpace: "nowrap",
+            scrollbarWidth: "none",
+            WebkitOverflowScrolling: "touch",
+            padding: "2px 0",
+          }}
+        >
           <button
             type="button"
             onClick={() => setSelectedCategory("ALL")}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border ${
+            className={`shrink-0 flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border ${
               selectedCategory === "ALL"
                 ? activeSegment === "expenses"
                   ? "bg-[#EA4335] text-white border-[#EA4335]"
@@ -683,7 +885,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                   key={cat.id}
                   type="button"
                   onClick={() => setSelectedCategory(cat.name)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border ${
+                  className={`shrink-0 flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border ${
                     selectedCategory === cat.name
                       ? "bg-[#EA4335] text-white border-[#EA4335]"
                       : "bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F1F3F4]"
@@ -697,7 +899,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                   key={cat.id}
                   type="button"
                   onClick={() => setSelectedCategory(cat.name)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border ${
+                  className={`shrink-0 flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border ${
                     selectedCategory === cat.name
                       ? "bg-[#0F9D58] text-white border-[#0F9D58]"
                       : "bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F1F3F4]"
@@ -712,7 +914,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               type="button"
               onClick={() => onOpenCategoryManager(activeSegment === "expenses" ? "expense" : "income")}
               title="Manage Categories"
-              className="px-2.5 py-1.5 bg-[#F1F3F4] hover:bg-[#E8EAED] text-[#5F6368] text-xs font-medium rounded-full border border-[#DADCE0] cursor-pointer"
+              className="shrink-0 flex-shrink-0 px-2.5 py-1.5 bg-[#F1F3F4] hover:bg-[#E8EAED] text-[#5F6368] text-xs font-medium rounded-full border border-[#DADCE0] cursor-pointer"
             >
               + Edit
             </button>
@@ -1037,6 +1239,37 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           )
         )}
       </div>
+
+      {/* 5. DOWNLOAD CONFIRMATION TOAST NOTIFICATION */}
+      {exportToast && (
+        <div
+          id="toast-export-success"
+          className="fixed bottom-6 right-6 z-50 max-w-sm w-[calc(100vw-3rem)] sm:w-full bg-[#202124] text-white p-4 rounded-2xl shadow-2xl border border-white/10 flex items-start gap-3 animate-slideUp"
+        >
+          <div className="w-8 h-8 rounded-xl bg-[#137333] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+            <FileSpreadsheet size={18} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#81C995]">
+              <Check size={14} />
+              <span>Downloaded for Excel & Sheets</span>
+            </div>
+            <p className="text-xs text-white font-semibold mt-0.5 leading-snug">
+              {exportToast.message}
+            </p>
+            <p className="text-[11px] text-[#9AA0A6] font-mono truncate mt-1">
+              {exportToast.filename}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExportToast(null)}
+            className="text-[#9AA0A6] hover:text-white p-1 text-xs cursor-pointer rounded-lg hover:bg-white/10 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 };

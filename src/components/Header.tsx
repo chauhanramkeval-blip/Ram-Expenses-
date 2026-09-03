@@ -183,11 +183,11 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="btn-export-csv-header"
               onClick={onOpenExportModal}
-              title="Export Expenses to CSV"
+              title="Export to Excel / Spreadsheet (.csv)"
               className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#137333] bg-[#E6F4EA] hover:bg-[#CEEAD6] rounded-full transition-colors cursor-pointer border border-[#CEEAD6]"
             >
               <FileSpreadsheet size={14} />
-              <span>CSV</span>
+              <span>Excel</span>
             </button>
             {onOpenCategoryManager && (
               <button

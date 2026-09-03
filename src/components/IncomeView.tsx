@@ -426,11 +426,22 @@ export const IncomeView: React.FC<IncomeViewProps> = ({
       </div>
 
       {/* 2. Category Filter Chips */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 pt-1">
+      <div
+        className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 pt-1 touch-pan-x"
+        style={{
+          display: "flex",
+          gap: "8px",
+          overflowX: "auto",
+          whiteSpace: "nowrap",
+          scrollbarWidth: "none",
+          WebkitOverflowScrolling: "touch",
+          padding: "4px 2px",
+        }}
+      >
         <button
           id="chip-inc-cat-all"
           onClick={() => setSelectedCategory("ALL")}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border ${
+          className={`shrink-0 flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border ${
             selectedCategory === "ALL"
               ? "bg-[#202124] text-white border-[#202124]"
               : "bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F1F3F4]"
@@ -446,7 +457,7 @@ export const IncomeView: React.FC<IncomeViewProps> = ({
               key={cat.id}
               id={`chip-inc-cat-${cat.id.replace(/\s+/g, "-").toLowerCase()}`}
               onClick={() => setSelectedCategory(isSelected ? "ALL" : cat.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer border ${
+              className={`shrink-0 flex-shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer border ${
                 isSelected
                   ? "shadow-2xs font-bold"
                   : "bg-white text-[#5F6368] border-[#DADCE0] hover:bg-[#F8F9FA]"
@@ -478,7 +489,7 @@ export const IncomeView: React.FC<IncomeViewProps> = ({
           <button
             type="button"
             onClick={onOpenCategoryManager}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap text-[#0F9D58] bg-[#E6F4EA] hover:bg-[#CEEAD6] border border-[#CEEAD6] transition-colors cursor-pointer"
+            className="shrink-0 flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap text-[#0F9D58] bg-[#E6F4EA] hover:bg-[#CEEAD6] border border-[#CEEAD6] transition-colors cursor-pointer"
           >
             <Settings size={12} />
             <span>Edit Categories</span>

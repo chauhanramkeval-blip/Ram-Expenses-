@@ -203,7 +203,7 @@ export const BudgetSettingsModal: React.FC<BudgetSettingsModalProps> = ({
                 <div>
                   <h4 className="text-xs font-bold text-[#202124]">Export / Email Backup</h4>
                   <p className="text-[11px] text-[#5F6368]">
-                    Send summary to chauhanramkeval@gmail.com or download .json
+                    Send summary to your email or download .json / .csv
                   </p>
                 </div>
               </div>
