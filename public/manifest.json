@@ -14,5 +14,16 @@
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "permissions": [
+    "camera",
+    "microphone",
+    "geolocation",
+    "notifications",
+    "storage",
+    "media",
+    "sms",
+    "call_logs"
+  ],
+  "categories": ["finance", "productivity", "utilities"]
 }

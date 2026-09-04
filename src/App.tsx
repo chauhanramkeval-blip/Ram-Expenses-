@@ -22,7 +22,16 @@ import { BackupModal } from "./components/BackupModal";
 import { FirebaseSyncModal } from "./components/FirebaseSyncModal";
 import { PdfReportModal } from "./components/PdfReportModal";
 import { InstallAppModal } from "./components/InstallAppModal";
+import { ReceiptScannerModal } from "./components/ReceiptScannerModal";
+import { VoiceLoggerModal } from "./components/VoiceLoggerModal";
+import { SmsBankReaderModal } from "./components/SmsBankReaderModal";
+import { MediaStorageManagerModal } from "./components/MediaStorageManagerModal";
+import { CallContactsLogModal } from "./components/CallContactsLogModal";
+import { PermissionDeniedModal } from "./components/PermissionDeniedModal";
+import { PermissionsManagerModal } from "./components/PermissionsManagerModal";
 import { BottomNav } from "./components/BottomNav";
+import { useRuntimePermissions } from "./hooks/useRuntimePermissions";
+import { resolveIndianCityFromCoordinates } from "./utils/permissionManager";
 import { INITIAL_EXPENSES, INITIAL_INCOMES } from "./data/initialExpenses";
 import { CATEGORY_LIST, INCOME_CATEGORY_LIST } from "./data/categories";
 import { KhataFullBackupData } from "./utils/backup";
@@ -150,6 +159,25 @@ export default function App() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [categoryModalTab, setCategoryModalTab] = useState<"expense" | "income">("expense");
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // Runtime 4-Step Architecture Permissions State & Modals
+  const {
+    permissions,
+    refreshPermissions,
+    executeWithPermission,
+    deniedModalOpen,
+    deniedPermissionType,
+    deniedErrorMessage,
+    closeDeniedModal,
+  } = useRuntimePermissions();
+
+  const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false);
+  const [isVoiceLoggerOpen, setIsVoiceLoggerOpen] = useState(false);
+  const [isSmsReaderOpen, setIsSmsReaderOpen] = useState(false);
+  const [isMediaStorageOpen, setIsMediaStorageOpen] = useState(false);
+  const [isCallContactsOpen, setIsCallContactsOpen] = useState(false);
+  const [isPermissionsHubOpen, setIsPermissionsHubOpen] = useState(false);
+  const [expensePrefill, setExpensePrefill] = useState<Partial<Expense> | null>(null);
 
   // Network online/offline status listener
   useEffect(() => {
@@ -749,7 +777,168 @@ export default function App() {
 
   const handleEditExpense = (expense: Expense) => {
     setEditingExpense(expense);
+    setExpensePrefill(null);
     setIsAddExpenseOpen(true);
+  };
+
+  // 4-Step Architecture Permission Handlers
+  const handleTriggerCameraScan = () => {
+    executeWithPermission(
+      "camera",
+      () => {
+        // Step 4 (Allow): Open Receipt Scanner
+        setIsReceiptScannerOpen(true);
+      },
+      () => {
+        // Step 4 (Deny fallback): open regular add expense modal
+        setIsAddExpenseOpen(true);
+      }
+    );
+  };
+
+  const handleTriggerVoiceLog = () => {
+    executeWithPermission(
+      "microphone",
+      () => {
+        // Step 4 (Allow): Open Voice Logger
+        setIsVoiceLoggerOpen(true);
+      },
+      () => {
+        // Step 4 (Deny fallback): open regular add expense modal
+        setIsAddExpenseOpen(true);
+      }
+    );
+  };
+
+  const handleTriggerLocationTag = () => {
+    executeWithPermission(
+      "geolocation",
+      (coords) => {
+        // Step 4 (Allow): Resolve city and prefill location
+        if (coords) {
+          const resolvedCity = resolveIndianCityFromCoordinates(coords.latitude, coords.longitude);
+          setExpensePrefill((prev) => ({
+            ...prev,
+            merchantOrLocation: `${resolvedCity.popularLocalities[0]}, ${resolvedCity.name}`,
+          }));
+        }
+      },
+      () => {
+        // Step 4 (Deny fallback): manual city selection via modal
+      }
+    );
+  };
+
+  const handleReceiptScanned = (scannedData: {
+    title: string;
+    amount: number;
+    category: string;
+    merchant: string;
+    date: string;
+  }) => {
+    setEditingExpense(null);
+    setExpensePrefill({
+      title: scannedData.title,
+      amount: scannedData.amount,
+      category: scannedData.category as any,
+      merchantOrLocation: scannedData.merchant,
+      date: scannedData.date,
+      paymentMode: "UPI",
+    });
+    setIsAddExpenseOpen(true);
+  };
+
+  const handleVoiceExpenseExtracted = (voiceData: {
+    title: string;
+    amount: number;
+    category: string;
+    paymentMode: string;
+    merchantOrLocation?: string;
+  }) => {
+    setEditingExpense(null);
+    setExpensePrefill({
+      title: voiceData.title,
+      amount: voiceData.amount,
+      category: voiceData.category as any,
+      paymentMode: voiceData.paymentMode as any,
+      merchantOrLocation: voiceData.merchantOrLocation || "",
+      date: new Date().toISOString().split("T")[0],
+    });
+    setIsAddExpenseOpen(true);
+  };
+
+  const handleTriggerSmsReader = () => {
+    executeWithPermission(
+      "sms",
+      () => {
+        // Step 4 (Allow): Open SMS Bank Reader Modal
+        setIsSmsReaderOpen(true);
+      },
+      () => {
+        // Step 4 (Deny fallback): open regular add expense modal
+        setIsAddExpenseOpen(true);
+      }
+    );
+  };
+
+  const handleTriggerMediaStorage = () => {
+    executeWithPermission(
+      "media",
+      () => {
+        // Step 4 (Allow): Open Media & Storage Manager Modal
+        setIsMediaStorageOpen(true);
+      },
+      () => {
+        // Step 4 (Deny fallback): open regular add expense modal
+        setIsAddExpenseOpen(true);
+      }
+    );
+  };
+
+  const handleTriggerCallContacts = () => {
+    executeWithPermission(
+      "call_logs",
+      () => {
+        // Step 4 (Allow): Open Call & Contacts Log Modal
+        setIsCallContactsOpen(true);
+      },
+      () => {
+        // Step 4 (Deny fallback): open regular add expense modal
+        setIsAddExpenseOpen(true);
+      }
+    );
+  };
+
+  const handleTestPermission = (type: any) => {
+    if (type === "camera") {
+      handleTriggerCameraScan();
+    } else if (type === "microphone") {
+      handleTriggerVoiceLog();
+    } else if (type === "geolocation") {
+      handleTriggerLocationTag();
+    } else if (type === "sms") {
+      handleTriggerSmsReader();
+    } else if (type === "media" || type === "storage") {
+      handleTriggerMediaStorage();
+    } else if (type === "call_logs") {
+      handleTriggerCallContacts();
+    } else if (type === "notifications") {
+      executeWithPermission(
+        "notifications",
+        () => {
+          if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+            try {
+              new Notification("Khata Daily Digest Active", {
+                body: "4-Step Notification permission granted successfully! You will receive daily spending reminders.",
+                icon: "/icon-192.png",
+              });
+            } catch {
+              // Notification fallback
+            }
+          }
+        }
+      );
+    }
   };
 
   // Income Handlers
@@ -862,6 +1051,7 @@ export default function App() {
         monthlyBudget={budget.monthlyBudget}
         onOpenAddExpense={() => {
           setEditingExpense(null);
+          setExpensePrefill(null);
           setIsAddExpenseOpen(true);
         }}
         onOpenAddIncome={() => {
@@ -875,6 +1065,7 @@ export default function App() {
         onOpenInstallModal={() => setIsInstallModalOpen(true)}
         onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
         onOpenCategoryManager={() => handleOpenCategoryManager(activeTab === "incomes" ? "income" : "expense")}
+        onOpenPermissionsHub={() => setIsPermissionsHubOpen(true)}
         isSecurityEnabled={securitySettings.isEnabled}
         onOpenSecurityModal={() => setIsSecurityModalOpen(true)}
         currentUser={currentUser}
@@ -959,11 +1150,125 @@ export default function App() {
         onClose={() => {
           setIsAddExpenseOpen(false);
           setEditingExpense(null);
+          setExpensePrefill(null);
         }}
         onSave={handleSaveExpense}
         editingExpense={editingExpense}
         customExpenseCategories={customExpenseCategories}
         onOpenCategoryManager={() => handleOpenCategoryManager("expense")}
+        onRequestCameraScan={handleTriggerCameraScan}
+        onRequestVoiceLog={handleTriggerVoiceLog}
+        onRequestLocationTag={handleTriggerLocationTag}
+        onRequestSmsReader={handleTriggerSmsReader}
+        onRequestMediaStorage={handleTriggerMediaStorage}
+        onRequestCallContacts={handleTriggerCallContacts}
+        initialPrefill={expensePrefill}
+      />
+
+      <ReceiptScannerModal
+        isOpen={isReceiptScannerOpen}
+        onClose={() => setIsReceiptScannerOpen(false)}
+        onReceiptScanned={handleReceiptScanned}
+      />
+
+      <VoiceLoggerModal
+        isOpen={isVoiceLoggerOpen}
+        onClose={() => setIsVoiceLoggerOpen(false)}
+        onExpenseExtracted={handleVoiceExpenseExtracted}
+      />
+
+      <SmsBankReaderModal
+        isOpen={isSmsReaderOpen}
+        onClose={() => setIsSmsReaderOpen(false)}
+        onImportExpense={(parsed) => {
+          setEditingExpense(null);
+          setExpensePrefill({
+            title: parsed.title,
+            amount: parsed.amount,
+            category: parsed.category as any,
+            paymentMode: parsed.paymentMode as any,
+            merchantOrLocation: parsed.merchantOrLocation,
+            date: parsed.date,
+          });
+          setIsAddExpenseOpen(true);
+        }}
+      />
+
+      <MediaStorageManagerModal
+        isOpen={isMediaStorageOpen}
+        onClose={() => setIsMediaStorageOpen(false)}
+        totalExpensesCount={expenses.length}
+        totalIncomesCount={incomes.length}
+        onRequestStoragePersist={async () => {
+          if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.persist) {
+            return await navigator.storage.persist();
+          }
+          return false;
+        }}
+        onAttachReceiptImage={(_imageUrl, suggestedExpense) => {
+          setEditingExpense(null);
+          if (suggestedExpense) {
+            setExpensePrefill({
+              title: suggestedExpense.title || "Bill Receipt",
+              amount: suggestedExpense.amount || 0,
+              category: (suggestedExpense.category || "Other Spends") as any,
+              merchantOrLocation: suggestedExpense.merchant || "Receipt Attachment",
+              date: suggestedExpense.date || new Date().toISOString().split("T")[0],
+              paymentMode: "UPI",
+            });
+          }
+          setIsAddExpenseOpen(true);
+        }}
+      />
+
+      <CallContactsLogModal
+        isOpen={isCallContactsOpen}
+        onClose={() => setIsCallContactsOpen(false)}
+        onSelectContactForExpense={(contact) => {
+          setEditingExpense(null);
+          setExpensePrefill({
+            title: contact.action === "split" ? `Split Khata with ${contact.name}` : `Payment to ${contact.name}`,
+            amount: 100,
+            category: "Food Delivery & Dining" as any,
+            paymentMode: "UPI",
+            merchantOrLocation: contact.name + (contact.upiId ? ` (${contact.upiId})` : ""),
+            date: new Date().toISOString().split("T")[0],
+          });
+          setIsAddExpenseOpen(true);
+        }}
+      />
+
+      <PermissionsManagerModal
+        isOpen={isPermissionsHubOpen}
+        onClose={() => setIsPermissionsHubOpen(false)}
+        permissions={permissions}
+        onTestPermission={handleTestPermission}
+        onRefreshPermissions={refreshPermissions}
+      />
+
+      <PermissionDeniedModal
+        isOpen={deniedModalOpen}
+        onClose={closeDeniedModal}
+        permissionType={deniedPermissionType}
+        errorMessage={deniedErrorMessage}
+        onRetry={() => {
+          if (deniedPermissionType) {
+            handleTestPermission(deniedPermissionType);
+          }
+        }}
+        onSelectFallbackCity={(cityStr) => {
+          setExpensePrefill((prev) => ({
+            ...prev,
+            merchantOrLocation: cityStr,
+          }));
+          setIsAddExpenseOpen(true);
+        }}
+        onTriggerFileUpload={() => {
+          setIsReceiptScannerOpen(true);
+        }}
+        onFocusManualInput={() => {
+          setIsAddExpenseOpen(true);
+        }}
       />
 
       <AddIncomeModal

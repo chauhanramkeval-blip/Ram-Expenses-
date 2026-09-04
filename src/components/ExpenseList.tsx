@@ -17,6 +17,7 @@ import { CategoryMeta, Expense, ExpenseCategory, PaymentMode } from "../types";
 import { CATEGORIES_DATA, CATEGORY_LIST } from "../data/categories";
 import { CategoryBadge, CategoryIcon, resolveExpenseMeta } from "./CategoryIcon";
 import { formatINR, formatFriendlyDate } from "../utils/formatters";
+import { exportTransactionsToExcel } from "../utils/export";
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -101,28 +102,13 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
     groupedByDate[groupKey].push(item);
   });
 
-  // Export CSV
+  // Export to Excel / CSV
   const handleExportCSV = () => {
     if (expenses.length === 0) return;
-    const headers = ["ID", "Date", "Title", "Category", "Amount(INR)", "PaymentMode", "Merchant", "Notes"];
-    const rows = expenses.map((e) => [
-      e.id,
-      e.date,
-      `"${e.title.replace(/"/g, '""')}"`,
-      `"${e.category}"`,
-      e.amount,
-      e.paymentMode,
-      `"${(e.merchantOrLocation || "").replace(/"/g, '""')}"`,
-      `"${(e.notes || "").replace(/"/g, '""')}"`,
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Khata_Expenses_Backup_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportTransactionsToExcel({
+      expenses: sorted.length > 0 ? sorted : expenses,
+      segment: "expenses",
+    });
   };
 
   return (

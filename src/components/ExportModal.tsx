@@ -61,8 +61,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     ];
 
     const rows = data.map((e) => [
-      `"${e.date.split("T")[0]}"`,
-      `"12:00 PM"`,
+      `"${e.date ? e.date.split("T")[0] : ""}"`,
+      `"${e.time || "12:00 PM"}"`,
       `"Expense"`,
       `"${e.category}"`,
       `"${(e.title || "").replace(/"/g, '""')}"`,

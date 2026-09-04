@@ -155,3 +155,104 @@ export interface UserAccount {
   securityAnswer?: string;
 }
 
+// ==========================================
+// 4-STEP RUNTIME PERMISSION ARCHITECTURE TYPES
+// ==========================================
+
+export type PermissionType =
+  | "camera"
+  | "microphone"
+  | "geolocation"
+  | "notifications"
+  | "media"
+  | "storage"
+  | "sms"
+  | "call_logs";
+
+export type PermissionStateStatus = "granted" | "denied" | "prompt" | "unsupported";
+
+export type PermissionStepStage = "declare" | "check" | "request" | "handle_result";
+
+export interface PermissionDeclaration {
+  type: PermissionType;
+  name: string;
+  title: string;
+  shortLabel: string;
+  category:
+    | "Hardware & Media"
+    | "Location & Spatial"
+    | "System Alerts"
+    | "Storage & Files"
+    | "Communications & SMS";
+  iconName: string;
+  osPromptReason: string;
+  description: string;
+  benefits: string[];
+  rationale: string;
+  fallbackAction: string;
+  fallbackLabel: string;
+  manifestDeclared: boolean;
+  framePermissionRequired: boolean;
+}
+
+export interface PermissionStatusInfo {
+  type: PermissionType;
+  status: PermissionStateStatus;
+  lastChecked: string;
+  canRequest: boolean;
+  errorMessage?: string;
+}
+
+export interface PermissionFlowState {
+  isOpen: boolean;
+  stage: PermissionStepStage;
+  permissionType: PermissionType | null;
+  status: PermissionStateStatus;
+  rationaleTitle?: string;
+  rationaleMessage?: string;
+  onAllow?: () => void;
+  onDeny?: () => void;
+}
+
+// Bank Transaction SMS Entry Interface (HDFC, SBI, ICICI, Axis, Paytm, GPay, etc.)
+export interface BankSmsTransaction {
+  id: string;
+  sender: string; // e.g. "HDFCBK", "SBIINB", "ICICIB", "AXISBK", "PAYTM"
+  bankName: string; // e.g. "HDFC Bank", "State Bank of India"
+  accountOrCard: string; // e.g. "A/c **4589" or "Card **1023"
+  amount: number;
+  type: "debit" | "credit";
+  merchantOrPayee: string; // e.g. "Swiggy", "Blinkit", "Zomato", "Indian Oil", "Rohan Verma"
+  rawText: string;
+  timestamp: string;
+  category: string;
+  paymentMode: "UPI" | "Debit / Credit Card" | "Net Banking" | "Cash";
+  imported?: boolean;
+}
+
+// Call / Contacts Log Interface for Expense Reconciliation & Split Khata
+export interface CallLogContact {
+  id: string;
+  name: string;
+  phone: string;
+  callType?: "incoming" | "outgoing" | "missed";
+  duration?: string;
+  timestamp: string;
+  suggestedAction?: "log_payment" | "split_expense" | "request_upi";
+  upiId?: string;
+  recentTransactionsCount?: number;
+}
+
+// Storage Quota & Media File Info
+export interface StorageQuotaInfo {
+  usageBytes: number;
+  quotaBytes: number;
+  usageFormatted: string;
+  quotaFormatted: string;
+  percentUsed: number;
+  isPersisted: boolean;
+  receiptImagesCount: number;
+  totalLedgerRecords: number;
+}
+
+

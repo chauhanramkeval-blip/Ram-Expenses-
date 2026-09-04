@@ -14,9 +14,11 @@ import {
   ShieldCheck,
   Send,
   Copy,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Expense, Income, UserBudget, UserAccount, CategoryMeta, IncomeCategoryMeta } from "../types";
 import { formatINR } from "../utils/formatters";
+import { exportTransactionsToExcel } from "../utils/export";
 import {
   createBackupObject,
   formatBackupSummaryText,
@@ -384,16 +386,36 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                 />
               </div>
 
-              {/* Download JSON Button */}
-              <button
-                type="button"
-                id="btn-download-json-file"
-                onClick={handleDownloadJson}
-                className="w-full py-3 bg-[#188038] hover:bg-[#137333] text-white font-bold text-xs sm:text-sm rounded-full shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-              >
-                <Download size={16} />
-                <span>Download .JSON Backup File</span>
-              </button>
+              {/* Download Buttons: JSON & Excel */}
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  id="btn-download-excel-file"
+                  onClick={() => {
+                    exportTransactionsToExcel({
+                      expenses,
+                      incomes,
+                      user: currentUser,
+                      segment: "all",
+                      format: "xlsx",
+                    });
+                  }}
+                  className="w-full py-3 bg-[#0F9D58] hover:bg-[#0B8043] text-white font-bold text-xs sm:text-sm rounded-full shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                >
+                  <FileSpreadsheet size={16} />
+                  <span>Download Excel Workbook (.xlsx)</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-download-json-file"
+                  onClick={handleDownloadJson}
+                  className="w-full py-2.5 bg-[#F1F3F4] hover:bg-[#E8EAED] text-[#202124] font-bold text-xs sm:text-sm rounded-full border border-[#DADCE0] transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                >
+                  <Download size={15} />
+                  <span>Download .JSON Backup File</span>
+                </button>
+              </div>
             </div>
           )}
 

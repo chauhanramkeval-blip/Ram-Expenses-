@@ -35,6 +35,7 @@ interface HeaderProps {
   onOpenInstallModal: () => void;
   onOpenBudgetModal: () => void;
   onOpenCategoryManager?: () => void;
+  onOpenPermissionsHub?: () => void;
   isSecurityEnabled?: boolean;
   onOpenSecurityModal?: () => void;
   currentUser?: UserAccount;
@@ -66,6 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenInstallModal,
   onOpenBudgetModal,
   onOpenCategoryManager,
+  onOpenPermissionsHub,
   isSecurityEnabled = false,
   onOpenSecurityModal,
   currentUser,
@@ -238,6 +240,7 @@ export const Header: React.FC<HeaderProps> = ({
               onOpenSecurityModal={onOpenSecurityModal || (() => {})}
               onOpenBackupModal={onOpenBackupModal}
               onOpenFirebaseSync={onOpenFirebaseSync}
+              onOpenPermissionsHub={onOpenPermissionsHub}
               onLogout={onLogout}
               onDeleteAccount={onDeleteAccount}
               onOpenNewAccountModal={onOpenNewAccountModal}

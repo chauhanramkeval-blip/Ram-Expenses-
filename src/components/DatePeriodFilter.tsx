@@ -90,7 +90,7 @@ export function calculatePresetRange(preset: PeriodPreset): { startDate: string;
 
       return {
         startDate: formatToYYYYMMDD(monday),
-        endDate: formatToYYYYMMDD(sunday > now ? now : sunday),
+        endDate: formatToYYYYMMDD(sunday),
         label: "This Week",
       };
     }
@@ -99,7 +99,7 @@ export function calculatePresetRange(preset: PeriodPreset): { startDate: string;
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       return {
         startDate: formatToYYYYMMDD(firstDay),
-        endDate: formatToYYYYMMDD(lastDay > now ? now : lastDay),
+        endDate: formatToYYYYMMDD(lastDay),
         label: "This Month",
       };
     }
@@ -116,7 +116,7 @@ export function calculatePresetRange(preset: PeriodPreset): { startDate: string;
       const qName = `Q${quarterIndex + 1} (${now.getFullYear()})`;
       return {
         startDate: formatToYYYYMMDD(firstDay),
-        endDate: formatToYYYYMMDD(lastDay > now ? now : lastDay),
+        endDate: formatToYYYYMMDD(lastDay),
         label: `Quality / Quarterly (${qName})`,
       };
     }

@@ -27,6 +27,7 @@ interface UserProfileMenuProps {
   onOpenSecurityModal?: () => void;
   onOpenBackupModal?: () => void;
   onOpenFirebaseSync?: () => void;
+  onOpenPermissionsHub?: () => void;
   onLogout?: () => void;
   onDeleteAccount?: (user: UserAccount) => void;
   onOpenNewAccountModal?: () => void;
@@ -47,6 +48,7 @@ const UserProfileMenuContent: React.FC<UserProfileMenuProps> = ({
   onOpenSecurityModal = () => {},
   onOpenBackupModal,
   onOpenFirebaseSync,
+  onOpenPermissionsHub,
   onLogout = () => {},
   onDeleteAccount,
   onLockSession,
@@ -282,6 +284,21 @@ const UserProfileMenuContent: React.FC<UserProfileMenuProps> = ({
                 >
                   <Cloud size={15} className="text-[#1A73E8]" />
                   <span>Cloud Backup & Sync</span>
+                </button>
+              )}
+
+              {onOpenPermissionsHub && (
+                <button
+                  id="btn-permissions-hub-menu-item"
+                  type="button"
+                  onClick={() => {
+                    handleClose();
+                    onOpenPermissionsHub();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[#202124] hover:bg-[#F1F3F4] rounded-xl transition-colors cursor-pointer"
+                >
+                  <ShieldCheck size={15} className="text-[#1A73E8]" />
+                  <span>Runtime Permissions Hub (4-Step)</span>
                 </button>
               )}
 

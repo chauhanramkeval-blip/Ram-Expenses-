@@ -570,7 +570,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             type="button"
             id="btn-export-excel-top"
             onClick={handleExportExcel}
-            title={`Export ${activeSegment === "expenses" ? "Expenses" : "Income"} to Excel spreadsheet (.csv)`}
+            title={`Export ${activeSegment === "expenses" ? "Expenses" : "Income"} to Excel workbook (.xlsx)`}
             className="flex items-center gap-1.5 px-3 py-2 bg-[#E6F4EA] hover:bg-[#CEEAD6] text-[#137333] border border-[#CEEAD6] rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
           >
             <FileSpreadsheet size={15} className="text-[#137333]" />

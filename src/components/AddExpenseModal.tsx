@@ -1,5 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { X, Check, Calendar, CreditCard, Sparkles, MapPin, Tag, ArrowRight, Settings } from "lucide-react";
+import {
+  X,
+  Check,
+  Calendar,
+  CreditCard,
+  Sparkles,
+  MapPin,
+  Tag,
+  ArrowRight,
+  Settings,
+  Camera,
+  Mic,
+  Compass,
+  MessageSquare,
+  Image as ImageIcon,
+  PhoneCall,
+} from "lucide-react";
 import { CATEGORY_LIST, CATEGORIES_DATA } from "../data/categories";
 import { CategoryMeta, Expense, ExpenseCategory, PaymentMode } from "../types";
 import { CategoryIcon, resolveExpenseMeta } from "./CategoryIcon";
@@ -13,6 +29,13 @@ interface AddExpenseModalProps {
   editingExpense?: Expense | null;
   customExpenseCategories?: CategoryMeta[];
   onOpenCategoryManager?: () => void;
+  onRequestCameraScan?: () => void;
+  onRequestVoiceLog?: () => void;
+  onRequestLocationTag?: () => void;
+  onRequestSmsReader?: () => void;
+  onRequestMediaStorage?: () => void;
+  onRequestCallContacts?: () => void;
+  initialPrefill?: Partial<Expense> | null;
 }
 
 const PAYMENT_MODES: { mode: PaymentMode; label: string; icon: string }[] = [
@@ -29,6 +52,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   editingExpense,
   customExpenseCategories,
   onOpenCategoryManager,
+  onRequestCameraScan,
+  onRequestVoiceLog,
+  onRequestLocationTag,
+  onRequestSmsReader,
+  onRequestMediaStorage,
+  onRequestCallContacts,
+  initialPrefill,
 }) => {
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
@@ -60,6 +90,23 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setDate(editingExpense.date);
       setMerchantOrLocation(editingExpense.merchantOrLocation || "");
       setNotes(editingExpense.notes || "");
+    } else if (initialPrefill) {
+      if (initialPrefill.title) setTitle(initialPrefill.title);
+      if (initialPrefill.amount) setAmount(initialPrefill.amount.toString());
+      if (initialPrefill.category) {
+        const isKnown = allExpenseCategories.some((c) => c.name === initialPrefill.category || c.id === initialPrefill.category);
+        if (isKnown) {
+          setCategory(initialPrefill.category);
+          setIsCustomCategory(false);
+        } else {
+          setCategory("Other Spends");
+          setIsCustomCategory(true);
+          setCustomCategoryName(initialPrefill.category);
+        }
+      }
+      if (initialPrefill.paymentMode) setPaymentMode(initialPrefill.paymentMode);
+      if (initialPrefill.merchantOrLocation) setMerchantOrLocation(initialPrefill.merchantOrLocation);
+      if (initialPrefill.notes) setNotes(initialPrefill.notes);
     } else {
       // Defaults for new expense
       setTitle("");
@@ -72,7 +119,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setMerchantOrLocation("");
       setNotes("");
     }
-  }, [editingExpense, isOpen, customExpenseCategories]);
+  }, [editingExpense, isOpen, customExpenseCategories, initialPrefill]);
 
   if (!isOpen) return null;
 
@@ -139,7 +186,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-[#F1F3F4] pb-3 mb-4">
+        <div className="flex items-center justify-between border-b border-[#F1F3F4] pb-3 mb-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-[#E8F0FE] flex items-center justify-center text-[#1A73E8] font-bold">
               ₹
@@ -159,6 +206,93 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             <X size={20} />
           </button>
         </div>
+
+        {/* Runtime 4-Step Action Bar (Scan Bill, Voice Log, SMS, Gallery, Split, GPS) */}
+        {!editingExpense && (
+          <div className="mb-4 bg-[#F8F9FA] p-2 rounded-2xl border border-[#E8EAED] space-y-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
+              {onRequestCameraScan && (
+                <button
+                  type="button"
+                  id="btn-trigger-camera-scan"
+                  onClick={onRequestCameraScan}
+                  className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-white hover:bg-[#E8F0FE] text-[#1A73E8] hover:text-[#1557B0] text-[11px] font-bold rounded-xl border border-[#DADCE0] hover:border-[#D2E3FC] shadow-2xs transition-all cursor-pointer truncate"
+                  title="Scan paper bill or UPI QR using Camera"
+                >
+                  <Camera size={13} />
+                  <span>Scan Bill</span>
+                </button>
+              )}
+
+              {onRequestVoiceLog && (
+                <button
+                  type="button"
+                  id="btn-trigger-voice-log"
+                  onClick={onRequestVoiceLog}
+                  className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-white hover:bg-[#E6F4EA] text-[#0F9D58] hover:text-[#0B8043] text-[11px] font-bold rounded-xl border border-[#DADCE0] hover:border-[#CEEAD6] shadow-2xs transition-all cursor-pointer truncate"
+                  title="Speak expense (e.g. 'Chai 40 rupees UPI') using Microphone"
+                >
+                  <Mic size={13} />
+                  <span>Voice Log</span>
+                </button>
+              )}
+
+              {onRequestSmsReader && (
+                <button
+                  type="button"
+                  id="btn-trigger-sms-reader"
+                  onClick={onRequestSmsReader}
+                  className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-white hover:bg-[#ECFDF5] text-[#059669] hover:text-[#047857] text-[11px] font-bold rounded-xl border border-[#DADCE0] hover:border-[#A7F3D0] shadow-2xs transition-all cursor-pointer truncate"
+                  title="Auto-read Bank / UPI SMS"
+                >
+                  <MessageSquare size={13} />
+                  <span>Read SMS</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5">
+              {onRequestMediaStorage && (
+                <button
+                  type="button"
+                  id="btn-trigger-media-storage"
+                  onClick={onRequestMediaStorage}
+                  className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-white hover:bg-[#FAF5FF] text-[#9333EA] hover:text-[#7E22CE] text-[11px] font-bold rounded-xl border border-[#DADCE0] hover:border-[#E9D5FF] shadow-2xs transition-all cursor-pointer truncate"
+                  title="Pick photo from gallery or manage storage"
+                >
+                  <ImageIcon size={13} />
+                  <span>Photo / Storage</span>
+                </button>
+              )}
+
+              {onRequestCallContacts && (
+                <button
+                  type="button"
+                  id="btn-trigger-call-contacts"
+                  onClick={onRequestCallContacts}
+                  className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-white hover:bg-[#FFF7ED] text-[#EA580C] hover:text-[#C2410C] text-[11px] font-bold rounded-xl border border-[#DADCE0] hover:border-[#FFEDD5] shadow-2xs transition-all cursor-pointer truncate"
+                  title="Split expense with phone contacts or calls"
+                >
+                  <PhoneCall size={13} />
+                  <span>Split / Contact</span>
+                </button>
+              )}
+
+              {onRequestLocationTag && (
+                <button
+                  type="button"
+                  id="btn-trigger-location-tag"
+                  onClick={onRequestLocationTag}
+                  className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-white hover:bg-[#FCE8E6] text-[#EA4335] hover:text-[#C5221F] text-[11px] font-bold rounded-xl border border-[#DADCE0] hover:border-[#FAD2CF] shadow-2xs transition-all cursor-pointer truncate"
+                  title="Auto-detect current city or market using Geolocation"
+                >
+                  <Compass size={13} />
+                  <span>GPS Tag</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Amount Input with big Indian Rupee font */}
@@ -353,17 +487,32 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#5F6368] mb-1">
-                Shop / App Name (Optional)
-              </label>
-              <input
-                id="input-expense-merchant"
-                type="text"
-                value={merchantOrLocation}
-                onChange={(e) => setMerchantOrLocation(e.target.value)}
-                placeholder="e.g. Blinkit, Swiggy, DMart"
-                className="w-full px-3 py-2 bg-[#F8F9FA] focus:bg-white text-xs text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-[#5F6368]">
+                  Shop / Market / Area
+                </label>
+                {onRequestLocationTag && (
+                  <button
+                    type="button"
+                    onClick={onRequestLocationTag}
+                    className="text-[10px] font-bold text-[#1A73E8] hover:text-[#1557B0] flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <Compass size={11} />
+                    <span>Auto-Detect GPS</span>
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  id="input-expense-merchant"
+                  type="text"
+                  value={merchantOrLocation}
+                  onChange={(e) => setMerchantOrLocation(e.target.value)}
+                  placeholder="e.g. Connaught Place, Blinkit, DMart"
+                  className="w-full pl-3 pr-8 py-2 bg-[#F8F9FA] focus:bg-white text-xs text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none"
+                />
+                <MapPin size={14} className="absolute right-2.5 top-2.5 text-[#5F6368] pointer-events-none" />
+              </div>
             </div>
           </div>
 

@@ -24,6 +24,7 @@ import { Income, IncomeCategory, PaymentMode, Expense, IncomeCategoryMeta } from
 import { INCOME_CATEGORIES_DATA, INCOME_CATEGORY_LIST } from "../data/categories";
 import { IncomeBadge, IncomeIcon, resolveIncomeMeta } from "./CategoryIcon";
 import { formatINR, formatFriendlyDate } from "../utils/formatters";
+import { exportTransactionsToExcel } from "../utils/export";
 
 interface IncomeViewProps {
   incomes: Income[];
@@ -159,42 +160,13 @@ export const IncomeView: React.FC<IncomeViewProps> = ({
     groupedByDate[groupKey].push(item);
   });
 
-  // Export CSV for Income
+  // Export to Excel / CSV for Income
   const handleExportIncomeCSV = () => {
     if (incomes.length === 0) return;
-    const headers = [
-      "ID",
-      "Date",
-      "Title",
-      "Category",
-      "Amount(INR)",
-      "DepositMode",
-      "Source/Employer",
-      "Notes",
-    ];
-    const rows = incomes.map((i) => [
-      i.id,
-      i.date,
-      `"${i.title.replace(/"/g, '""')}"`,
-      `"${i.category}"`,
-      i.amount,
-      i.paymentMode,
-      `"${(i.sourceOrClient || "").replace(/"/g, '""')}"`,
-      `"${(i.notes || "").replace(/"/g, '""')}"`,
-    ]);
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `Khata_Income_Statement_${new Date().toISOString().split("T")[0]}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportTransactionsToExcel({
+      incomes: sorted.length > 0 ? sorted : incomes,
+      segment: "income",
+    });
   };
 
   return (

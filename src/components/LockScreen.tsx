@@ -147,13 +147,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     ) {
       setShowForgotModal(false);
       onResetSecurity();
-      alert("PIN successfully reset! You can now access your finances and set a new PIN in settings.");
       onUnlock();
     } else if (!correctAns.trim()) {
       // Default reset if no question was configured
       setShowForgotModal(false);
       onResetSecurity();
-      alert("PIN Lock removed. Please configure a new PIN in Security Settings.");
       onUnlock();
     } else {
       setForgotError("Incorrect answer to security question. Please try again.");
