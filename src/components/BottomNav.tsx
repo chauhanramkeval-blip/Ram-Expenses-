@@ -1,9 +1,9 @@
 import React from "react";
-import { Plus, ListFilter, PieChart, Sparkles, Wallet, ArrowDownRight } from "lucide-react";
+import { Plus, ListFilter, PieChart, Table2, Wallet } from "lucide-react";
 
 interface BottomNavProps {
-  activeTab: "transactions" | "expenses" | "incomes" | "visuals" | "advisor";
-  onTabChange: (tab: "transactions" | "expenses" | "incomes" | "visuals" | "advisor") => void;
+  activeTab: "transactions" | "expenses" | "incomes" | "visuals" | "monthly" | "advisor";
+  onTabChange: (tab: "transactions" | "expenses" | "incomes" | "visuals" | "monthly") => void;
   onOpenAddExpense: () => void;
   onOpenAddIncome: () => void;
 }
@@ -100,20 +100,20 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         </button>
 
         <button
-          id="mobile-nav-advisor"
-          onClick={() => onTabChange("advisor")}
+          id="mobile-nav-monthly-table"
+          onClick={() => onTabChange("monthly")}
           className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
-            activeTab === "advisor" ? "text-[#B06000] font-bold" : "text-[#5F6368]"
+            activeTab === "monthly" || activeTab === "advisor" ? "text-[#1A73E8] font-bold" : "text-[#5F6368]"
           }`}
         >
           <div
             className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-              activeTab === "advisor" ? "bg-[#FEF7E0]" : ""
+              activeTab === "monthly" || activeTab === "advisor" ? "bg-[#E8F0FE]" : ""
             }`}
           >
-            <Sparkles size={16} className={activeTab === "advisor" ? "text-[#F9AB00]" : ""} />
+            <Table2 size={16} className={activeTab === "monthly" || activeTab === "advisor" ? "text-[#1A73E8]" : ""} />
           </div>
-          <span className="text-[10px]">Advisor</span>
+          <span className="text-[10px]">Monthly Table</span>
         </button>
       </nav>
     </>

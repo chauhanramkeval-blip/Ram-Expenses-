@@ -13,6 +13,7 @@ import {
   Fingerprint,
   Mail,
   Cloud,
+  Table2,
 } from "lucide-react";
 import { formatINR } from "../utils/formatters";
 import { UserAccount } from "../types";
@@ -21,8 +22,8 @@ import { UserProfileMenu } from "./UserProfileMenu";
 interface HeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  activeTab: "transactions" | "expenses" | "incomes" | "visuals" | "advisor";
-  onTabChange: (tab: "transactions" | "expenses" | "incomes" | "visuals" | "advisor") => void;
+  activeTab: "transactions" | "expenses" | "incomes" | "visuals" | "monthly" | "advisor";
+  onTabChange: (tab: "transactions" | "expenses" | "incomes" | "visuals" | "monthly") => void;
   totalSpentThisMonth: number;
   totalIncomeThisMonth: number;
   monthlyBudget: number;
@@ -35,7 +36,6 @@ interface HeaderProps {
   onOpenInstallModal: () => void;
   onOpenBudgetModal: () => void;
   onOpenCategoryManager?: () => void;
-  onOpenPermissionsHub?: () => void;
   isSecurityEnabled?: boolean;
   onOpenSecurityModal?: () => void;
   currentUser?: UserAccount;
@@ -67,7 +67,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenInstallModal,
   onOpenBudgetModal,
   onOpenCategoryManager,
-  onOpenPermissionsHub,
   isSecurityEnabled = false,
   onOpenSecurityModal,
   currentUser,
@@ -240,7 +239,6 @@ export const Header: React.FC<HeaderProps> = ({
               onOpenSecurityModal={onOpenSecurityModal || (() => {})}
               onOpenBackupModal={onOpenBackupModal}
               onOpenFirebaseSync={onOpenFirebaseSync}
-              onOpenPermissionsHub={onOpenPermissionsHub}
               onLogout={onLogout}
               onDeleteAccount={onDeleteAccount}
               onOpenNewAccountModal={onOpenNewAccountModal}
@@ -305,18 +303,18 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
-            id="tab-btn-advisor"
-            onClick={() => onTabChange("advisor")}
+            id="tab-btn-monthly"
+            onClick={() => onTabChange("monthly")}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === "advisor"
-                ? "bg-[#FEF7E0] text-[#B06000] border border-[#FEEFC3] shadow-2xs font-bold"
+              activeTab === "monthly" || activeTab === "advisor"
+                ? "bg-[#E8F0FE] text-[#1A73E8] border border-[#D2E3FC] shadow-2xs font-bold"
                 : "text-[#5F6368] hover:bg-[#F1F3F4] hover:text-[#202124]"
             }`}
           >
-            <Sparkles size={14} className="text-[#F9AB00]" />
-            <span>AI Finance Advisor</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#FEEFC3] text-[#B06000] font-bold">
-              Daily
+            <Table2 size={14} className={activeTab === "monthly" || activeTab === "advisor" ? "text-[#1A73E8]" : "text-[#5F6368]"} />
+            <span>📋 Monthly Statement Table</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#1A73E8] text-white font-bold">
+              All
             </span>
           </button>
         </div>

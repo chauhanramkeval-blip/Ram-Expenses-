@@ -6,6 +6,7 @@ import { ExpenseList } from "./components/ExpenseList";
 import { IncomeView } from "./components/IncomeView";
 import { VisualizationView } from "./components/VisualizationView";
 import { DailyAdvisorView } from "./components/DailyAdvisorView";
+import { MonthlyTableView } from "./components/MonthlyTableView";
 import { AddExpenseModal } from "./components/AddExpenseModal";
 import { AddIncomeModal } from "./components/AddIncomeModal";
 import { CategoryManagerModal } from "./components/CategoryManagerModal";
@@ -27,8 +28,6 @@ import { VoiceLoggerModal } from "./components/VoiceLoggerModal";
 import { SmsBankReaderModal } from "./components/SmsBankReaderModal";
 import { MediaStorageManagerModal } from "./components/MediaStorageManagerModal";
 import { CallContactsLogModal } from "./components/CallContactsLogModal";
-import { PermissionDeniedModal } from "./components/PermissionDeniedModal";
-import { PermissionsManagerModal } from "./components/PermissionsManagerModal";
 import { BottomNav } from "./components/BottomNav";
 import { useRuntimePermissions } from "./hooks/useRuntimePermissions";
 import { resolveIndianCityFromCoordinates } from "./utils/permissionManager";
@@ -141,7 +140,7 @@ export default function App() {
   });
 
   // UI States
-  const [activeTab, setActiveTab] = useState<"transactions" | "expenses" | "incomes" | "visuals" | "advisor">("transactions");
+  const [activeTab, setActiveTab] = useState<"transactions" | "expenses" | "incomes" | "visuals" | "monthly" | "advisor">("transactions");
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -176,7 +175,6 @@ export default function App() {
   const [isSmsReaderOpen, setIsSmsReaderOpen] = useState(false);
   const [isMediaStorageOpen, setIsMediaStorageOpen] = useState(false);
   const [isCallContactsOpen, setIsCallContactsOpen] = useState(false);
-  const [isPermissionsHubOpen, setIsPermissionsHubOpen] = useState(false);
   const [expensePrefill, setExpensePrefill] = useState<Partial<Expense> | null>(null);
 
   // Network online/offline status listener
@@ -1065,7 +1063,6 @@ export default function App() {
         onOpenInstallModal={() => setIsInstallModalOpen(true)}
         onOpenBudgetModal={() => setIsBudgetModalOpen(true)}
         onOpenCategoryManager={() => handleOpenCategoryManager(activeTab === "incomes" ? "income" : "expense")}
-        onOpenPermissionsHub={() => setIsPermissionsHubOpen(true)}
         isSecurityEnabled={securitySettings.isEnabled}
         onOpenSecurityModal={() => setIsSecurityModalOpen(true)}
         currentUser={currentUser}
@@ -1104,7 +1101,7 @@ export default function App() {
               setIsAddIncomeOpen(true);
             }}
             onNavigateToVisuals={() => setActiveTab("visuals")}
-            onNavigateToAdvisor={() => setActiveTab("advisor")}
+            onNavigateToAdvisor={() => setActiveTab("monthly")}
             customExpenseCategories={customExpenseCategories}
             customIncomeCategories={customIncomeCategories}
             onOpenCategoryManager={handleOpenCategoryManager}
@@ -1117,15 +1114,38 @@ export default function App() {
           <VisualizationView
             expenses={expenses}
             monthlyBudget={budget.monthlyBudget}
-            onNavigateToAdvisor={() => setActiveTab("advisor")}
+            onNavigateToAdvisor={() => setActiveTab("monthly")}
+            onEditExpense={handleEditExpense}
+            onDeleteExpense={handleDeleteExpense}
+            onOpenAddExpense={() => {
+              setEditingExpense(null);
+              setIsAddExpenseOpen(true);
+            }}
           />
         )}
 
-        {/* Tab 4: Daily Advisor & AI Insights */}
-        {activeTab === "advisor" && (
-          <DailyAdvisorView
+        {/* Tab 4: Monthly All Expenses & Income Statement Table Format */}
+        {(activeTab === "monthly" || activeTab === "advisor") && (
+          <MonthlyTableView
             expenses={expenses}
-            monthlyBudget={budget.monthlyBudget}
+            incomes={incomes}
+            budget={budget}
+            currentUser={currentUser}
+            onEditExpense={handleEditExpense}
+            onDeleteExpense={handleDeleteExpense}
+            onOpenAddExpense={() => {
+              setEditingExpense(null);
+              setIsAddExpenseOpen(true);
+            }}
+            onEditIncome={handleEditIncome}
+            onDeleteIncome={handleDeleteIncome}
+            onOpenAddIncome={() => {
+              setEditingIncome(null);
+              setIsAddIncomeOpen(true);
+            }}
+            customExpenseCategories={customExpenseCategories}
+            customIncomeCategories={customIncomeCategories}
+            onNavigateToVisuals={() => setActiveTab("visuals")}
           />
         )}
       </main>
@@ -1156,12 +1176,6 @@ export default function App() {
         editingExpense={editingExpense}
         customExpenseCategories={customExpenseCategories}
         onOpenCategoryManager={() => handleOpenCategoryManager("expense")}
-        onRequestCameraScan={handleTriggerCameraScan}
-        onRequestVoiceLog={handleTriggerVoiceLog}
-        onRequestLocationTag={handleTriggerLocationTag}
-        onRequestSmsReader={handleTriggerSmsReader}
-        onRequestMediaStorage={handleTriggerMediaStorage}
-        onRequestCallContacts={handleTriggerCallContacts}
         initialPrefill={expensePrefill}
       />
 
@@ -1234,39 +1248,6 @@ export default function App() {
             merchantOrLocation: contact.name + (contact.upiId ? ` (${contact.upiId})` : ""),
             date: new Date().toISOString().split("T")[0],
           });
-          setIsAddExpenseOpen(true);
-        }}
-      />
-
-      <PermissionsManagerModal
-        isOpen={isPermissionsHubOpen}
-        onClose={() => setIsPermissionsHubOpen(false)}
-        permissions={permissions}
-        onTestPermission={handleTestPermission}
-        onRefreshPermissions={refreshPermissions}
-      />
-
-      <PermissionDeniedModal
-        isOpen={deniedModalOpen}
-        onClose={closeDeniedModal}
-        permissionType={deniedPermissionType}
-        errorMessage={deniedErrorMessage}
-        onRetry={() => {
-          if (deniedPermissionType) {
-            handleTestPermission(deniedPermissionType);
-          }
-        }}
-        onSelectFallbackCity={(cityStr) => {
-          setExpensePrefill((prev) => ({
-            ...prev,
-            merchantOrLocation: cityStr,
-          }));
-          setIsAddExpenseOpen(true);
-        }}
-        onTriggerFileUpload={() => {
-          setIsReceiptScannerOpen(true);
-        }}
-        onFocusManualInput={() => {
           setIsAddExpenseOpen(true);
         }}
       />

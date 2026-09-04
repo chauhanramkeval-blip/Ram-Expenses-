@@ -32,6 +32,7 @@ import { CategoryIcon, IncomeIcon, resolveExpenseMeta, resolveIncomeMeta } from 
 import { CATEGORY_LIST, INCOME_CATEGORY_LIST } from "../data/categories";
 import { formatINR, formatFriendlyDate } from "../utils/formatters";
 import { exportTransactionsToExcel } from "../utils/export";
+import { StorageMeterCard } from "./StorageMeterCard";
 
 export interface TransactionsViewProps {
   expenses: Expense[];
@@ -88,6 +89,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [dateFilterMode, setDateFilterMode] = useState<"today" | "week" | "month" | "year" | "all">("month");
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+  const [showDetailedStorageMeter, setShowDetailedStorageMeter] = useState(true);
 
   // Internal search / filter state
   const [localSearch, setLocalSearch] = useState("");
@@ -700,156 +702,194 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         </button>
       </div>
 
-      {/* 2. DYNAMIC SUMMARY HEADER CARD */}
-      <div
-        id="transactions-summary-card"
-        className={`rounded-3xl border p-4 sm:p-6 shadow-xs transition-all ${
-          activeSegment === "expenses"
-            ? "bg-gradient-to-br from-white via-white to-[#FCE8E6]/30 border-[#FAD2CF]"
-            : "bg-gradient-to-br from-white via-white to-[#E6F4EA]/40 border-[#CEEAD6]"
-        }`}
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Main Total Metric */}
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span
-                className={`w-2.5 h-2.5 rounded-full ${
-                  activeSegment === "expenses" ? "bg-[#EA4335]" : "bg-[#0F9D58]"
-                }`}
-              />
-              <span className="text-xs font-bold uppercase tracking-wider text-[#5F6368]">
-                {activeSegment === "expenses" ? "Total Spent" : "Total Earned"} •{" "}
-                <span className="font-semibold text-[#202124]">
-                  {dateFilterMode === "month"
-                    ? currentMonthLabel
-                    : dateFilterMode === "today"
-                    ? "Today"
-                    : dateFilterMode === "week"
-                    ? "This Week"
-                    : dateFilterMode === "year"
-                    ? `This Year (${currentDate.getFullYear()})`
-                    : "All Time"}
-                </span>
-              </span>
-            </div>
-
-            <div className="flex items-baseline gap-3 flex-wrap">
-              <h2
-                className={`text-3xl sm:text-4xl font-extrabold tracking-tight ${
-                  activeSegment === "expenses" ? "text-[#EA4335]" : "text-[#0F9D58]"
-                }`}
-              >
-                {activeSegment === "expenses" ? `- ${formatINR(totalSpent)}` : `+ ${formatINR(totalEarned)}`}
-              </h2>
-
-              <span className="text-xs font-semibold text-[#5F6368]">
-                {activeSegment === "expenses"
-                  ? `${filteredExpenses.length} expense${filteredExpenses.length === 1 ? "" : "s"}`
-                  : `${filteredIncomes.length} income inflow${filteredIncomes.length === 1 ? "" : "s"}`}
-              </span>
-            </div>
-
-            {/* Contextual Stats subtitle */}
-            <p className="text-xs text-[#5F6368] flex items-center gap-1.5 flex-wrap">
-              <span className="font-bold text-[#202124]">{userDisplayName}</span>
-              <span>•</span>
-              {activeSegment === "expenses" ? (
-                <>
-                  Budget: <strong className="text-[#202124]">{formatINR(monthlyLimit)}</strong> (
-                  <span className={isOverBudget ? "text-[#EA4335] font-bold" : "text-[#137333] font-bold"}>
-                    {percentBudgetUsed}% used
-                  </span>
-                  ) • {isOverBudget ? "Exceeded by " + formatINR(totalSpent - monthlyLimit) : formatINR(remainingBudget) + " remaining"}
-                </>
-              ) : (
-                <>
-                  Salary & Bonus: <strong className="text-[#202124]">{formatINR(totalSalary)}</strong> • Extra/Freelance:{" "}
-                  <strong className="text-[#0F9D58]">{formatINR(totalExtra)}</strong>
-                </>
-              )}
-            </p>
-          </div>
-
-          {/* Quick Month Navigator & Excel Export Shortcut */}
-          <div className="flex items-center gap-2 self-start md:self-center">
+      {/* 2. DYNAMIC SUMMARY / STORAGE METER CARD */}
+      {activeSegment === "expenses" && showDetailedStorageMeter && dateFilterMode === "month" ? (
+        <div className="relative">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <span className="text-xs font-bold text-[#5F6368] flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#1A73E8]"></span>
+              <span>Monthly Budget Tracker & Health</span>
+            </span>
             <button
               type="button"
-              id="btn-export-excel-summary"
-              onClick={handleExportExcel}
-              title={`Export ${activeSegment === "expenses" ? "Expenses" : "Income"} to Excel`}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E6F4EA] hover:bg-[#CEEAD6] text-[#137333] border border-[#CEEAD6] rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+              id="btn-toggle-compact-summary"
+              onClick={() => setShowDetailedStorageMeter(false)}
+              className="text-[11px] font-semibold text-[#5F6368] hover:text-[#1A73E8] flex items-center gap-1 cursor-pointer bg-white px-3 py-1 rounded-full border border-[#E8EAED] hover:bg-[#F8F9FA] transition-all shadow-2xs"
             >
-              <Download size={13} />
-              <span>Export</span>
+              <span>Compact View</span>
             </button>
-
-            <div className="flex items-center gap-1 bg-[#F8F9FA] p-1 rounded-2xl border border-[#E8EAED]">
-              <button
-                type="button"
-                onClick={handlePrevMonth}
-                title="Previous Month"
-                className="p-1 hover:bg-white rounded-xl text-[#5F6368] hover:text-[#202124] transition-colors cursor-pointer"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span className="text-xs font-bold text-[#202124] px-1.5 whitespace-nowrap">
-                {currentMonthLabel}
-              </span>
-              <button
-                type="button"
-                onClick={handleNextMonth}
-                title="Next Month"
-                className="p-1 hover:bg-white rounded-xl text-[#5F6368] hover:text-[#202124] transition-colors cursor-pointer"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
           </div>
+
+          <StorageMeterCard
+            expenses={expenses}
+            monthlyBudget={monthlyLimit}
+            onOpenAddExpense={onOpenAddExpense}
+            onNavigateToVisuals={onNavigateToVisuals}
+            onNavigateToAdvisor={onNavigateToAdvisor}
+          />
         </div>
+      ) : (
+        <div
+          id="transactions-summary-card"
+          className={`rounded-3xl border p-4 sm:p-6 shadow-xs transition-all ${
+            activeSegment === "expenses"
+              ? "bg-gradient-to-br from-white via-white to-[#FCE8E6]/30 border-[#FAD2CF]"
+              : "bg-gradient-to-br from-white via-white to-[#E6F4EA]/40 border-[#CEEAD6]"
+          }`}
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Main Total Metric */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    activeSegment === "expenses" ? "bg-[#EA4335]" : "bg-[#0F9D58]"
+                  }`}
+                />
+                <span className="text-xs font-bold uppercase tracking-wider text-[#5F6368]">
+                  {activeSegment === "expenses" ? "Total Spent" : "Total Earned"} •{" "}
+                  <span className="font-semibold text-[#202124]">
+                    {dateFilterMode === "month"
+                      ? currentMonthLabel
+                      : dateFilterMode === "today"
+                      ? "Today"
+                      : dateFilterMode === "week"
+                      ? "This Week"
+                      : dateFilterMode === "year"
+                      ? `This Year (${currentDate.getFullYear()})`
+                      : "All Time"}
+                  </span>
+                </span>
+              </div>
 
-        {/* Progress bar for Expenses or Savings preview for Income */}
-        {activeSegment === "expenses" ? (
-          <div className="mt-4 pt-3 border-t border-[#F1F3F4] space-y-1.5">
-            <div className="flex justify-between text-[11px] font-semibold text-[#5F6368]">
-              <span>Monthly Spend Progress</span>
-              <span>{percentBudgetUsed}%</span>
+              <div className="flex items-baseline gap-3 flex-wrap">
+                <h2
+                  className={`text-3xl sm:text-4xl font-extrabold tracking-tight ${
+                    activeSegment === "expenses" ? "text-[#EA4335]" : "text-[#0F9D58]"
+                  }`}
+                >
+                  {activeSegment === "expenses" ? `- ${formatINR(totalSpent)}` : `+ ${formatINR(totalEarned)}`}
+                </h2>
+
+                <span className="text-xs font-semibold text-[#5F6368]">
+                  {activeSegment === "expenses"
+                    ? `${filteredExpenses.length} expense${filteredExpenses.length === 1 ? "" : "s"}`
+                    : `${filteredIncomes.length} income inflow${filteredIncomes.length === 1 ? "" : "s"}`}
+                </span>
+              </div>
+
+              {/* Contextual Stats subtitle */}
+              <p className="text-xs text-[#5F6368] flex items-center gap-1.5 flex-wrap">
+                <span className="font-bold text-[#202124]">{userDisplayName}</span>
+                <span>•</span>
+                {activeSegment === "expenses" ? (
+                  <>
+                    Budget: <strong className="text-[#202124]">{formatINR(monthlyLimit)}</strong> (
+                    <span className={isOverBudget ? "text-[#EA4335] font-bold" : "text-[#137333] font-bold"}>
+                      {percentBudgetUsed}% used
+                    </span>
+                    ) • {isOverBudget ? "Exceeded by " + formatINR(totalSpent - monthlyLimit) : formatINR(remainingBudget) + " remaining"}
+                  </>
+                ) : (
+                  <>
+                    Salary & Bonus: <strong className="text-[#202124]">{formatINR(totalSalary)}</strong> • Extra/Freelance:{" "}
+                    <strong className="text-[#0F9D58]">{formatINR(totalExtra)}</strong>
+                  </>
+                )}
+              </p>
             </div>
-            <div className="w-full bg-[#E8EAED] h-2 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  isOverBudget ? "bg-[#EA4335]" : percentBudgetUsed > 80 ? "bg-[#FBBC04]" : "bg-[#1A73E8]"
-                }`}
-                style={{ width: `${percentBudgetUsed}%` }}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="mt-4 pt-3 border-t border-[#F1F3F4] flex items-center justify-between text-xs text-[#5F6368]">
-            <div className="flex items-center gap-1.5">
-              <Wallet size={15} className="text-[#0F9D58]" />
-              <span>Net Balance (Earned - Spent):</span>
-              <strong
-                className={`font-bold ${
-                  totalEarned - totalSpent >= 0 ? "text-[#0F9D58]" : "text-[#EA4335]"
-                }`}
-              >
-                {formatINR(totalEarned - totalSpent)}
-              </strong>
-            </div>
-            {onNavigateToVisuals && (
+
+            {/* Quick Actions / Month Nav */}
+            <div className="flex items-center gap-2 self-start md:self-center">
+              {activeSegment === "expenses" && (
+                <button
+                  type="button"
+                  id="btn-show-meter-view"
+                  onClick={() => setShowDetailedStorageMeter(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E8F0FE] hover:bg-[#D2E3FC] text-[#1A73E8] border border-[#D2E3FC] rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                >
+                  <span>Health Meter</span>
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={onNavigateToVisuals}
-                className="text-[#1A73E8] hover:underline font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                id="btn-export-excel-summary"
+                onClick={handleExportExcel}
+                title={`Export ${activeSegment === "expenses" ? "Expenses" : "Income"} to Excel`}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E6F4EA] hover:bg-[#CEEAD6] text-[#137333] border border-[#CEEAD6] rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
               >
-                <span>View Analytics</span>
-                <ArrowRight size={13} />
+                <Download size={13} />
+                <span>Export</span>
               </button>
-            )}
+
+              <div className="flex items-center gap-1 bg-[#F8F9FA] p-1 rounded-2xl border border-[#E8EAED]">
+                <button
+                  type="button"
+                  onClick={handlePrevMonth}
+                  title="Previous Month"
+                  className="p-1 hover:bg-white rounded-xl text-[#5F6368] hover:text-[#202124] transition-colors cursor-pointer"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-xs font-bold text-[#202124] px-1.5 whitespace-nowrap">
+                  {currentMonthLabel}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
+                  title="Next Month"
+                  className="p-1 hover:bg-white rounded-xl text-[#5F6368] hover:text-[#202124] transition-colors cursor-pointer"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Progress bar for Expenses or Savings preview for Income */}
+          {activeSegment === "expenses" ? (
+            <div className="mt-4 pt-3 border-t border-[#F1F3F4] space-y-1.5">
+              <div className="flex justify-between text-[11px] font-semibold text-[#5F6368]">
+                <span>Monthly Spend Progress</span>
+                <span>{percentBudgetUsed}%</span>
+              </div>
+              <div className="w-full bg-[#E8EAED] h-2 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    isOverBudget ? "bg-[#EA4335]" : percentBudgetUsed > 80 ? "bg-[#FBBC04]" : "bg-[#1A73E8]"
+                  }`}
+                  style={{ width: `${percentBudgetUsed}%` }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 pt-3 border-t border-[#F1F3F4] flex items-center justify-between text-xs text-[#5F6368]">
+              <div className="flex items-center gap-1.5">
+                <Wallet size={15} className="text-[#0F9D58]" />
+                <span>Net Balance (Earned - Spent):</span>
+                <strong
+                  className={`font-bold ${
+                    totalEarned - totalSpent >= 0 ? "text-[#0F9D58]" : "text-[#EA4335]"
+                  }`}
+                >
+                  {formatINR(totalEarned - totalSpent)}
+                </strong>
+              </div>
+              {onNavigateToVisuals && (
+                <button
+                  type="button"
+                  onClick={onNavigateToVisuals}
+                  className="text-[#1A73E8] hover:underline font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                >
+                  <span>View Analytics</span>
+                  <ArrowRight size={13} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 3. FILTERS & SEARCH ROW */}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
