@@ -1,0 +1,149 @@
+{
+  "entities": {
+    "UserAddress": {
+      "title": "UserAddress",
+      "description": "User physical address records for store locations, delivery tagging, and geographic expense attribution.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "tag": { "type": "string", "enum": ["Home", "Work", "Shop / Business", "Branch", "Other"] },
+        "fullAddress": { "type": "string", "maxLength": 500 },
+        "streetOrArea": { "type": "string", "maxLength": 200 },
+        "landmark": { "type": "string", "maxLength": 200 },
+        "city": { "type": "string", "maxLength": 100 },
+        "state": { "type": "string", "maxLength": 100 },
+        "pincode": { "type": "string", "pattern": "^[0-9]{6}$", "maxLength": 10 },
+        "country": { "type": "string", "maxLength": 50 },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "isDefault": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "tag", "fullAddress", "city", "state", "pincode", "country", "createdAt"]
+    },
+    "PermissionAuditRecord": {
+      "title": "PermissionAuditRecord",
+      "description": "State tracking and device consent history for media, storage, SMS, contacts, and call history permissions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "platform": { "type": "string", "enum": ["android", "web", "ios"] },
+        "deviceModel": { "type": "string", "maxLength": 100 },
+        "osVersion": { "type": "string", "maxLength": 50 },
+        "permissions": { "type": "object" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "platform", "permissions", "updatedAt"]
+    },
+    "CallHistoryRecord": {
+      "title": "CallHistoryRecord",
+      "description": "Call log records synchronized with user consent for bill splitting, contact reconciliation, and transaction attribution.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "contactName": { "type": "string", "maxLength": 150 },
+        "phoneNumberMasked": { "type": "string", "maxLength": 30 },
+        "phoneNumberHash": { "type": "string", "maxLength": 64 },
+        "callType": { "type": "string", "enum": ["incoming", "outgoing", "missed", "rejected"] },
+        "callDurationSeconds": { "type": "integer" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "associatedKhataAmount": { "type": "number" },
+        "reconciledWithExpenseId": { "type": "string", "maxLength": 128 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "syncedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "contactName", "phoneNumberMasked", "phoneNumberHash", "callType", "callDurationSeconds", "timestamp", "syncedAt"]
+    },
+    "MediaRecord": {
+      "title": "MediaRecord",
+      "description": "Uploaded invoice snapshots, payment screenshot proofs, and receipt scans.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "expenseId": { "type": "string", "maxLength": 128 },
+        "fileName": { "type": "string", "maxLength": 255 },
+        "mimeType": { "type": "string", "maxLength": 50 },
+        "fileSizeBytes": { "type": "integer" },
+        "storagePath": { "type": "string", "maxLength": 500 },
+        "thumbnailDataUrl": { "type": "string" },
+        "ocrExtractedAmount": { "type": "number" },
+        "ocrExtractedMerchant": { "type": "string", "maxLength": 150 },
+        "ocrExtractedDate": { "type": "string", "maxLength": 30 },
+        "uploadedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "fileName", "mimeType", "fileSizeBytes", "uploadedAt"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Expense transaction records in INR.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "amount": { "type": "number" },
+        "category": { "type": "string", "maxLength": 100 },
+        "paymentMode": { "type": "string", "maxLength": 50 },
+        "date": { "type": "string", "maxLength": 20 },
+        "time": { "type": "string", "maxLength": 10 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "merchantOrLocation": { "type": "string", "maxLength": 200 },
+        "isRecurring": { "type": "boolean" },
+        "syncedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "amount", "category", "paymentMode", "date"]
+    },
+    "Income": {
+      "title": "Income",
+      "description": "Income inflow records in INR.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "amount": { "type": "number" },
+        "category": { "type": "string", "maxLength": 100 },
+        "streamType": { "type": "string", "maxLength": 50 },
+        "paymentMode": { "type": "string", "maxLength": 50 },
+        "date": { "type": "string", "maxLength": 20 },
+        "time": { "type": "string", "maxLength": 10 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "sourceOrClient": { "type": "string", "maxLength": 200 },
+        "isRecurring": { "type": "boolean" },
+        "syncedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "amount", "category", "paymentMode", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/addresses/{addressId}": {
+      "schema": { "$ref": "#/entities/UserAddress" },
+      "description": "User saved addresses and location tags"
+    },
+    "/users/{userId}/permissions/{auditId}": {
+      "schema": { "$ref": "#/entities/PermissionAuditRecord" },
+      "description": "Permission grant status and device metadata audit log"
+    },
+    "/users/{userId}/call_history/{callId}": {
+      "schema": { "$ref": "#/entities/CallHistoryRecord" },
+      "description": "Call history records for split khata and reconciliation"
+    },
+    "/users/{userId}/media/{mediaId}": {
+      "schema": { "$ref": "#/entities/MediaRecord" },
+      "description": "Receipt images, invoices, and payment screenshots"
+    },
+    "/users/{userId}/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "Personal expense entries"
+    },
+    "/users/{userId}/incomes/{incomeId}": {
+      "schema": { "$ref": "#/entities/Income" },
+      "description": "Personal income entries"
+    }
+  }
+}

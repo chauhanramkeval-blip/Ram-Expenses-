@@ -255,4 +255,76 @@ export interface StorageQuotaInfo {
   totalLedgerRecords: number;
 }
 
+// User Address Schema
+export interface UserAddress {
+  id: string;
+  userId: string;
+  tag: "Home" | "Work" | "Shop / Business" | "Branch" | "Other";
+  fullAddress: string;
+  streetOrArea: string;
+  landmark?: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  latitude?: number;
+  longitude?: number;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Call History Sync Record
+export interface CallHistoryRecord {
+  id: string;
+  userId: string;
+  contactName: string;
+  phoneNumberMasked: string;
+  phoneNumberHash: string;
+  callType: "incoming" | "outgoing" | "missed" | "rejected";
+  callDurationSeconds: number;
+  timestamp: string;
+  associatedKhataAmount?: number;
+  reconciledWithExpenseId?: string;
+  notes?: string;
+  syncedAt: string;
+}
+
+// Permission State & Audit Sync Record
+export interface PermissionAuditRecord {
+  id: string;
+  userId: string;
+  platform: "android" | "web" | "ios";
+  deviceModel?: string;
+  osVersion?: string;
+  permissions: Record<
+    PermissionType,
+    {
+      status: PermissionStateStatus;
+      grantedAt?: string;
+      revokedAt?: string;
+      lastRequestedAt?: string;
+      reasonShown?: string;
+    }
+  >;
+  updatedAt: string;
+}
+
+// Media Record (Receipts, Bill Photos, Invoices)
+export interface MediaRecord {
+  id: string;
+  userId: string;
+  expenseId?: string;
+  fileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  storagePath?: string;
+  thumbnailDataUrl?: string;
+  ocrExtractedAmount?: number;
+  ocrExtractedMerchant?: string;
+  ocrExtractedDate?: string;
+  uploadedAt: string;
+}
+
+
 
