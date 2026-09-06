@@ -62,7 +62,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
     "Personal" | "Business / Shop" | "Household & Family"
   >("Personal");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState("+919935612249");
   const [upiId, setUpiId] = useState("");
   const [pin, setPin] = useState("");
   const [showSignupPin, setShowSignupPin] = useState(false);
@@ -931,8 +931,8 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full pl-9 pr-2 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none transition-all"
+                    placeholder="+919935612249"
+                    className="w-full pl-9 pr-2 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none transition-all font-mono"
                   />
                 </div>
               </div>
@@ -969,42 +969,35 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                   <span>Set 4-Digit Security PIN *</span>
                 </span>
                 <span className="text-[10px] text-[#137333] font-bold bg-[#E6F4EA] px-2 py-0.5 rounded-full border border-[#CEEAD6]">
-                  Data Encryption
+                  Required for Unlock
                 </span>
               </div>
 
-              <div className="flex items-center gap-2.5">
-                <div className="relative">
-                  <input
-                    id="signup-pin"
-                    type={showSignupPin ? "text" : "password"}
-                    maxLength={4}
-                    inputMode="numeric"
-                    required
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    placeholder="••••"
-                    className="w-32 py-2 pl-3 pr-8 text-center text-base font-bold bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none tracking-widest font-mono shadow-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSignupPin(!showSignupPin)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5F6368] hover:text-[#1A73E8] cursor-pointer"
-                    title={showSignupPin ? "Hide PIN" : "Show PIN"}
-                    aria-label={showSignupPin ? "Hide PIN" : "Show PIN"}
-                  >
-                    {showSignupPin ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
+              <div className="relative">
+                <input
+                  id="signup-pin"
+                  type={showSignupPin ? "text" : "password"}
+                  maxLength={4}
+                  inputMode="numeric"
+                  required
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="••••"
+                  className="w-full py-2.5 pl-4 pr-10 text-center text-lg font-bold bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/20 outline-none tracking-[0.3em] font-mono shadow-xs"
+                />
                 <button
                   type="button"
-                  onClick={() => setPin("1234")}
-                  className="text-[11px] font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-2.5 py-1.5 rounded-xl border border-[#D2E3FC] transition-colors cursor-pointer flex items-center gap-1"
+                  onClick={() => setShowSignupPin(!showSignupPin)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5F6368] hover:text-[#1A73E8] cursor-pointer p-1"
+                  title={showSignupPin ? "Hide PIN" : "Show PIN"}
+                  aria-label={showSignupPin ? "Hide PIN" : "Show PIN"}
                 >
-                  <Sparkles size={12} />
-                  <span>Use Default (1234)</span>
+                  {showSignupPin ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              <p className="text-[11px] text-[#5F6368] text-center">
+                Enter your secret 4-digit PIN. You will need this to unlock your account.
+              </p>
             </div>
 
             {/* Create Account Action */}

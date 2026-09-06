@@ -662,7 +662,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     type="tel"
                     value={regPhone}
                     onChange={(e) => setRegPhone(e.target.value)}
-                    placeholder="9876543210"
+                    placeholder="9935612249"
                     className="w-full px-3 py-2 text-xs bg-[#F8F9FA] focus:bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none font-mono"
                   />
                 </div>

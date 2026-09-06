@@ -25,8 +25,8 @@ const AddAccountModalContent: React.FC<AddAccountModalProps> = ({
 }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [pin, setPin] = useState("1234");
+  const [phone, setPhone] = useState("+919935612249");
+  const [pin, setPin] = useState("");
   const [showPin, setShowPin] = useState(false);
   const [password, setPassword] = useState("khata123");
   const [accountType, setAccountType] = useState<"Personal" | "Business / Shop" | "Household & Family">(
@@ -43,8 +43,8 @@ const AddAccountModalContent: React.FC<AddAccountModalProps> = ({
       return;
     }
 
-    if (pin && pin.length !== 4) {
-      setErrorMsg("Security PIN must be exactly 4 digits.");
+    if (!pin || pin.length !== 4) {
+      setErrorMsg("Please enter a secure 4-digit PIN.");
       return;
     }
 
@@ -52,7 +52,7 @@ const AddAccountModalContent: React.FC<AddAccountModalProps> = ({
       id: "user-" + Date.now(),
       name: name.trim(),
       email: email.trim() || `${name.toLowerCase().replace(/\s+/g, "")}@khata.in`,
-      phone: phone.trim() || "+91 98000 00000",
+      phone: phone.trim() || "+919935612249",
       avatarColor:
         accountType === "Business / Shop"
           ? "#188038"
@@ -63,7 +63,7 @@ const AddAccountModalContent: React.FC<AddAccountModalProps> = ({
       joinedDate: "Today",
       lastLogin: "Just now",
       authProvider: "pin",
-      pin: pin || "1234",
+      pin: pin,
       password: password || "khata123",
       securityQuestion: "What is your favorite city?",
       securityAnswer: "Mumbai",
@@ -150,8 +150,8 @@ const AddAccountModalContent: React.FC<AddAccountModalProps> = ({
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 98000 00000"
-                className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-[#F8F9FA] focus:bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none"
+                placeholder="+919935612249"
+                className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-[#F8F9FA] focus:bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none font-mono"
               />
             </div>
           </div>
@@ -177,7 +177,7 @@ const AddAccountModalContent: React.FC<AddAccountModalProps> = ({
                     required
                     value={pin}
                     onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    placeholder="1234"
+                    placeholder="••••"
                     className="w-full pl-8 pr-7 py-1.5 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none font-mono tracking-widest text-center"
                   />
                   <button
