@@ -122,6 +122,108 @@ function escapeCSVCell(value: string | number | undefined | null): string {
   return `"${str}"`;
 }
 
+export interface DeliverFileResult {
+  success: boolean;
+  action: "shared" | "downloaded";
+  filename: string;
+  error?: string;
+}
+
+/**
+ * Universal Mobile-Friendly File Delivery:
+ * 1. Checks if the device is a mobile app / supports navigator.canShare with files.
+ * 2. If supported, uses navigator.share({ files: [file], title: ... }) so Android APK / WebView / Mobile
+ *    opens the native share/save sheet (Save to device storage, Google Drive, WhatsApp, Excel, etc.).
+ * 3. If navigator.share fails, is dismissed, or is unsupported, falls back to standard Blob URL download
+ *    with explicit MIME types (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet or text/csv).
+ * 4. Provides comprehensive error reporting for WebView environments.
+ */
+export async function deliverExportFile(
+  blob: Blob,
+  filename: string,
+  mimeType: string,
+  title: string = "Khata Export"
+): Promise<DeliverFileResult> {
+  // 1. Try Native Mobile Web Share API with File object (Android WebView / APK / Chrome Mobile / PWA)
+  let file: File | null = null;
+  try {
+    if (typeof File !== "undefined") {
+      file = new File([blob], filename, {
+        type: mimeType,
+        lastModified: Date.now(),
+      });
+    }
+  } catch (err) {
+    console.warn("Could not instantiate File object for native share:", err);
+  }
+
+  if (
+    file &&
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function" &&
+    typeof navigator.canShare === "function"
+  ) {
+    try {
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: title,
+          text: `Khata Transaction Export: ${filename}`,
+        });
+        return {
+          success: true,
+          action: "shared",
+          filename,
+        };
+      }
+    } catch (shareErr: any) {
+      // If the user cancelled/closed the native Android share sheet, treat as handled
+      if (shareErr?.name === "AbortError") {
+        return {
+          success: true,
+          action: "shared",
+          filename,
+        };
+      }
+      console.warn("navigator.share encountered an error, attempting Blob download fallback:", shareErr);
+    }
+  }
+
+  // 2. Fallback: Standard Blob URL Anchor Download with explicit MIME type
+  try {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+
+    setTimeout(() => {
+      try {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+        URL.revokeObjectURL(url);
+      } catch {}
+    }, 1500);
+
+    return {
+      success: true,
+      action: "downloaded",
+      filename,
+    };
+  } catch (downloadErr: any) {
+    console.error("Standard blob download failed in WebView:", downloadErr);
+    return {
+      success: false,
+      action: "downloaded",
+      filename,
+      error: downloadErr?.message || "File download could not be completed in this WebView.",
+    };
+  }
+}
+
 export interface ExportOptions {
   expenses?: Expense[];
   incomes?: Income[];
@@ -132,18 +234,24 @@ export interface ExportOptions {
 }
 
 /**
- * Generates and triggers download of authentic native Excel (.xlsx) or CSV file.
+ * Generates and triggers universal download/share of authentic native Excel (.xlsx) or CSV file.
  * Creates structured multi-tab worksheets for Excel with auto-sized columns,
  * summary calculations, and proper numeric formatting.
  */
-export function exportTransactionsToExcel({
+export async function exportTransactionsToExcel({
   expenses = [],
   incomes = [],
   user,
   filterScopeName,
   segment = "all",
   format = "xlsx",
-}: ExportOptions): { success: boolean; filename: string; count: number } {
+}: ExportOptions): Promise<{
+  success: boolean;
+  filename: string;
+  count: number;
+  action: "shared" | "downloaded";
+  error?: string;
+}> {
   const expenseRecords: ExportRecord[] = [];
   const incomeRecords: ExportRecord[] = [];
 
@@ -217,21 +325,16 @@ export function exportTransactionsToExcel({
 
     const csvContent = "\uFEFF" + csvRows.join("\r\n");
     const filename = `Khata_${segment === "expenses" ? "Expenses" : segment === "income" ? "Income" : "Statement"}_${sanitizedUserName}_${currentDateStr}.csv`;
+    const csvBlob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const delivery = await deliverExportFile(csvBlob, filename, "text/csv;charset=utf-8;", "Khata CSV Statement");
 
     return {
-      success: true,
+      success: delivery.success,
       filename,
       count: totalCount,
+      action: delivery.action,
+      error: delivery.error,
     };
   }
 
@@ -425,12 +528,24 @@ export function exportTransactionsToExcel({
   // Output filename
   const filename = `Khata_${segment === "expenses" ? "Expenses" : segment === "income" ? "Income" : "Financial_Statement"}_${sanitizedUserName}_${currentDateStr}.xlsx`;
 
-  // Write file buffer and trigger download in browser
-  XLSX.writeFile(wb, filename);
+  // Write Excel binary buffer with explicit XLSX MIME type
+  const excelArrayBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const excelBlob = new Blob([excelArrayBuffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+
+  const delivery = await deliverExportFile(
+    excelBlob,
+    filename,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "Khata Financial Statement"
+  );
 
   return {
-    success: true,
+    success: delivery.success,
     filename,
     count: totalCount,
+    action: delivery.action,
+    error: delivery.error,
   };
 }

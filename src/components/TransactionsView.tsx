@@ -321,27 +321,52 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   // Active user's profile display name
   const userDisplayName = currentUser?.name?.trim() || "Your Name";
 
-  // Handle Export to Excel / CSV with UTF-8 BOM
-  const handleExportExcel = () => {
-    const dataExpenses = activeSegment === "expenses" ? filteredExpenses : expenses;
-    const dataIncomes = activeSegment === "income" ? filteredIncomes : incomes;
+  // Handle Export to Excel / CSV with universal Android APK / WebView / Browser support
+  const handleExportExcel = async () => {
+    try {
+      const dataExpenses = activeSegment === "expenses" ? filteredExpenses : expenses;
+      const dataIncomes = activeSegment === "income" ? filteredIncomes : incomes;
 
-    const result = exportTransactionsToExcel({
-      expenses: dataExpenses,
-      incomes: dataIncomes,
-      user: currentUser,
-      segment: activeSegment,
-    });
+      const result = await exportTransactionsToExcel({
+        expenses: dataExpenses,
+        incomes: dataIncomes,
+        user: currentUser,
+        segment: activeSegment,
+      });
 
-    setExportToast({
-      show: true,
-      message: `Exported ${result.count} ${activeSegment === "expenses" ? "expenses" : "income transactions"} to Excel!`,
-      filename: result.filename,
-    });
+      if (!result.success) {
+        setExportToast({
+          show: true,
+          message: `Export failed: ${result.error || "Could not save file on this device"}`,
+          filename: result.filename,
+        });
+        setTimeout(() => setExportToast(null), 5000);
+        return;
+      }
 
-    setTimeout(() => {
-      setExportToast(null);
-    }, 4500);
+      const toastText =
+        result.action === "shared"
+          ? `Shared ${result.count} ${activeSegment === "expenses" ? "expenses" : "income transactions"} via Android sheet!`
+          : `Exported ${result.count} ${activeSegment === "expenses" ? "expenses" : "income transactions"} to Excel!`;
+
+      setExportToast({
+        show: true,
+        message: toastText,
+        filename: result.filename,
+      });
+
+      setTimeout(() => {
+        setExportToast(null);
+      }, 4500);
+    } catch (err: any) {
+      console.error("Export error:", err);
+      setExportToast({
+        show: true,
+        message: `Export error: ${err?.message || "Check storage permission"}`,
+        filename: "",
+      });
+      setTimeout(() => setExportToast(null), 5000);
+    }
   };
 
   return (

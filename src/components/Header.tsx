@@ -14,6 +14,8 @@ import {
   Mail,
   Cloud,
   Table2,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { formatINR } from "../utils/formatters";
 import { UserAccount } from "../types";
@@ -48,6 +50,8 @@ interface HeaderProps {
   onLockSession?: () => void;
   isFirebaseOnline?: boolean;
   isFirebaseSynced?: boolean;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -79,6 +83,8 @@ export const Header: React.FC<HeaderProps> = ({
   onLockSession,
   isFirebaseOnline = true,
   isFirebaseSynced = true,
+  isDarkMode = false,
+  onToggleDarkMode,
 }) => {
   return (
     <header id="khata-app-header" className="sticky top-0 z-30 bg-white border-b border-[#E8EAED] shadow-xs w-full max-w-[100vw] overflow-x-hidden">
@@ -230,6 +236,28 @@ export const Header: React.FC<HeaderProps> = ({
               <SlidersHorizontal size={16} />
             </button>
 
+            {/* Global Dark Mode Theme Toggle Button */}
+            {onToggleDarkMode && (
+              <button
+                id="btn-theme-toggle-header"
+                type="button"
+                onClick={onToggleDarkMode}
+                title={isDarkMode ? "Switch to Day Mode (Light Theme)" : "Switch to Night Mode (Dark Theme)"}
+                aria-label={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
+                className={`p-1.5 sm:p-2 rounded-full transition-all cursor-pointer border flex items-center justify-center ${
+                  isDarkMode
+                    ? "bg-[#2D3139] text-[#FDD663] border-[#484F5E] hover:bg-[#383D47] shadow-2xs hover:text-[#FFE082]"
+                    : "bg-[#F1F3F4] text-[#5F6368] border-[#DADCE0] hover:text-[#1A73E8] hover:bg-[#E8F0FE]"
+                }`}
+              >
+                {isDarkMode ? (
+                  <Sun size={16} className="text-[#FDD663] transition-transform hover:rotate-45" />
+                ) : (
+                  <Moon size={16} className="text-[#5F6368] transition-transform hover:-rotate-12" />
+                )}
+              </button>
+            )}
+
             {/* User Profile Menu Avatar Button */}
             <UserProfileMenu
               currentUser={currentUser}
@@ -243,6 +271,8 @@ export const Header: React.FC<HeaderProps> = ({
               onDeleteAccount={onDeleteAccount}
               onOpenNewAccountModal={onOpenNewAccountModal}
               onLockSession={onLockSession}
+              isDarkMode={isDarkMode}
+              onToggleDarkMode={onToggleDarkMode}
             />
           </div>
         </div>

@@ -93,8 +93,8 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   };
 
   // Handle Download JSON
-  const handleDownloadJson = () => {
-    downloadJsonBackupFile(backupData);
+  const handleDownloadJson = async () => {
+    return await downloadJsonBackupFile(backupData);
   };
 
   // Handle Copy Summary
@@ -391,14 +391,22 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                 <button
                   type="button"
                   id="btn-download-excel-file"
-                  onClick={() => {
-                    exportTransactionsToExcel({
-                      expenses,
-                      incomes,
-                      user: currentUser,
-                      segment: "all",
-                      format: "xlsx",
-                    });
+                  onClick={async () => {
+                    try {
+                      const res = await exportTransactionsToExcel({
+                        expenses,
+                        incomes,
+                        user: currentUser,
+                        segment: "all",
+                        format: "xlsx",
+                      });
+                      if (!res.success) {
+                        alert("Export notice: " + (res.error || "Could not save file on this device."));
+                      }
+                    } catch (err: any) {
+                      console.error("Excel export error:", err);
+                      alert("Export failed: " + (err?.message || "Check storage permission"));
+                    }
                   }}
                   className="w-full py-3 bg-[#0F9D58] hover:bg-[#0B8043] text-white font-bold text-xs sm:text-sm rounded-full shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                 >
@@ -409,7 +417,17 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                 <button
                   type="button"
                   id="btn-download-json-file"
-                  onClick={handleDownloadJson}
+                  onClick={async () => {
+                    try {
+                      const res = await handleDownloadJson();
+                      if (res && !res.success) {
+                        alert("JSON export notice: " + (res.error || "Could not save file on this device."));
+                      }
+                    } catch (err: any) {
+                      console.error("JSON export error:", err);
+                      alert("JSON export failed: " + (err?.message || "Check storage permission"));
+                    }
+                  }}
                   className="w-full py-2.5 bg-[#F1F3F4] hover:bg-[#E8EAED] text-[#202124] font-bold text-xs sm:text-sm rounded-full border border-[#DADCE0] transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                 >
                   <Download size={15} />

@@ -3,6 +3,12 @@
 @layer base {
   body {
     font-family: "Google Sans", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  html.dark body {
+    background-color: #121316;
+    color: #F8F9FA;
   }
 }
 
@@ -23,6 +29,14 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #BDC1C6;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #3C404B;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #5F6368;
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -55,10 +69,248 @@
   }
 }
 
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-scaleUp {
   animation: scaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slideDown {
+  animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ========================================================================= */
+/* GLOBAL HIGH-CONTRAST DARK MODE THEME FOR NIGHT-TIME FINANCE TRACKING       */
+/* ========================================================================= */
+
+.dark {
+  color-scheme: dark;
+}
+
+/* Base Surfaces & Layout in Dark Mode */
+.dark #khata-app-root,
+.dark body {
+  background-color: #121316 !important;
+  color: #F8F9FA !important;
+}
+
+.dark .bg-white {
+  background-color: #1A1C20 !important;
+}
+
+.dark .bg-\[\#F8F9FA\] {
+  background-color: #121316 !important;
+}
+
+.dark .bg-\[\#F1F3F4\] {
+  background-color: #22252A !important;
+}
+
+.dark .bg-\[\#E8EAED\] {
+  background-color: #2D3139 !important;
+}
+
+.dark .bg-\[\#F8FAFF\] {
+  background-color: #19202D !important;
+}
+
+/* High Contrast Accent Surfaces in Dark Mode */
+.dark .bg-\[\#E8F0FE\] {
+  background-color: rgba(26, 115, 232, 0.2) !important;
+}
+
+.dark .bg-\[\#FCE8E6\] {
+  background-color: rgba(217, 48, 37, 0.22) !important;
+}
+
+.dark .bg-\[\#E6F4EA\] {
+  background-color: rgba(15, 157, 88, 0.22) !important;
+}
+
+.dark .bg-\[\#FEF7E0\] {
+  background-color: rgba(249, 171, 0, 0.2) !important;
+}
+
+.dark .bg-\[\#FEEFC3\] {
+  background-color: rgba(249, 171, 0, 0.28) !important;
+}
+
+.dark .bg-\[\#D2E3FC\] {
+  background-color: rgba(138, 180, 248, 0.28) !important;
+}
+
+.dark .bg-\[\#CEEAD6\] {
+  background-color: rgba(129, 201, 149, 0.28) !important;
+}
+
+.dark .bg-\[\#FAD2CF\] {
+  background-color: rgba(242, 139, 130, 0.28) !important;
+}
+
+/* Hover States in Dark Mode */
+.dark .hover\:bg-\[\#F1F3F4\]:hover {
+  background-color: #282C33 !important;
+}
+
+.dark .hover\:bg-\[\#E8EAED\]:hover {
+  background-color: #333842 !important;
+}
+
+.dark .hover\:bg-\[\#F8F9FA\]:hover {
+  background-color: #22252A !important;
+}
+
+.dark .hover\:bg-white:hover {
+  background-color: #252830 !important;
+}
+
+.dark .hover\:bg-\[\#E8F0FE\]:hover {
+  background-color: rgba(26, 115, 232, 0.3) !important;
+}
+
+.dark .hover\:bg-\[\#FCE8E6\]:hover {
+  background-color: rgba(217, 48, 37, 0.3) !important;
+}
+
+.dark .hover\:bg-\[\#E6F4EA\]:hover {
+  background-color: rgba(15, 157, 88, 0.3) !important;
+}
+
+/* High Contrast Borders in Dark Mode */
+.dark .border-\[\#E8EAED\] {
+  border-color: #2B2F38 !important;
+}
+
+.dark .border-\[\#DADCE0\] {
+  border-color: #3A3F4B !important;
+}
+
+.dark .border-\[\#BDC1C6\] {
+  border-color: #484F5E !important;
+}
+
+.dark .border-\[\#D2E3FC\] {
+  border-color: rgba(138, 180, 248, 0.38) !important;
+}
+
+.dark .border-\[\#FAD2CF\] {
+  border-color: rgba(242, 139, 130, 0.38) !important;
+}
+
+.dark .border-\[\#CEEAD6\] {
+  border-color: rgba(129, 201, 149, 0.38) !important;
+}
+
+.dark .border-\[\#FEEFC3\] {
+  border-color: rgba(253, 214, 99, 0.38) !important;
+}
+
+.dark .border-b-\[\#F1F3F4\],
+.dark .border-t-\[\#F1F3F4\] {
+  border-color: #262A32 !important;
+}
+
+/* High-Contrast Typography for Night-Time Finance Tracking */
+.dark .text-\[\#202124\] {
+  color: #F8F9FA !important;
+}
+
+.dark .text-\[\#3C4043\] {
+  color: #E8EAED !important;
+}
+
+.dark .text-\[\#5F6368\] {
+  color: #A6ACB5 !important;
+}
+
+.dark .text-\[\#80868B\] {
+  color: #BDC1C6 !important;
+}
+
+/* High-Contrast Financial Numbers & Semantic Colors in Dark Mode */
+.dark .text-\[\#1A73E8\] {
+  color: #8AB4F8 !important; /* Luminous Google Blue */
+}
+
+.dark .text-\[\#D93025\],
+.dark .text-\[\#C5221F\],
+.dark .text-\[\#EA4335\] {
+  color: #FF7B72 !important; /* Luminous High-Contrast Debit Red */
+}
+
+.dark .text-\[\#0F9D58\],
+.dark .text-\[\#137333\],
+.dark .text-\[\#188038\],
+.dark .text-\[\#1E8E3E\] {
+  color: #34D399 !important; /* Luminous High-Contrast Credit Emerald */
+}
+
+.dark .text-\[\#B06000\],
+.dark .text-\[\#F9AB00\],
+.dark .text-\[\#E37400\],
+.dark .text-\[\#FBBC04\] {
+  color: #FDD663 !important; /* Luminous Amber Alert */
+}
+
+/* Inputs, Textareas & Select Elements in Dark Mode */
+.dark input[type="text"],
+.dark input[type="number"],
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="password"],
+.dark select,
+.dark textarea {
+  background-color: #22252A;
+  color: #F8F9FA;
+  border-color: #3A3F4B;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #80868B !important;
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #8AB4F8 !important;
+  background-color: #1E2229 !important;
+}
+
+/* Dialogs, Popovers & Modals in Dark Mode */
+.dark .shadow-xl,
+.dark .shadow-2xl,
+.dark .shadow-lg {
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.7), 0 0 0 1px #2B2F38 !important;
+}
+
+/* High Contrast Header in Dark Mode */
+.dark #khata-app-header {
+  background-color: #1A1C20 !important;
+  border-bottom-color: #2B2F38 !important;
+}
+
+/* Sticky Bottom Navigation in Dark Mode */
+.dark #bottom-mobile-nav {
+  background-color: #1A1C20 !important;
+  border-top-color: #2B2F38 !important;
+}
+
+/* Glass / Backdrop Blur in Dark Mode */
+.dark .backdrop-blur-sm,
+.dark .backdrop-blur-md {
+  background-color: rgba(18, 19, 22, 0.8) !important;
 }

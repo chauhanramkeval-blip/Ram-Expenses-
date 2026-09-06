@@ -24,6 +24,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [exportScope, setExportScope] = useState<"all" | "filtered" | "current-month">("all");
   const [copied, setCopied] = useState(false);
 
+  const [exporting, setExporting] = useState(false);
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
   const now = new Date();
@@ -38,13 +41,38 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     return expenses;
   };
 
-  const handleDownloadCSV = () => {
+  const handleDownloadCSV = async () => {
     const data = getExportData();
-    exportTransactionsToExcel({
-      expenses: data,
-      user: currentUser,
-      segment: "expenses",
-    });
+    if (data.length === 0) {
+      alert("No records to export in the selected range.");
+      return;
+    }
+
+    setExporting(true);
+    setExportStatus(null);
+    try {
+      const res = await exportTransactionsToExcel({
+        expenses: data,
+        user: currentUser,
+        segment: "expenses",
+        format: "xlsx",
+      });
+
+      if (!res.success) {
+        alert("Export failed: " + (res.error || "Could not save file on this device."));
+      } else {
+        setExportStatus(res.action === "shared" ? "File shared successfully!" : `Downloaded ${res.filename}`);
+        setTimeout(() => {
+          setExportStatus(null);
+          onClose();
+        }, 1800);
+      }
+    } catch (err: any) {
+      console.error("Export error:", err);
+      alert("Failed to export: " + (err?.message || "Unknown error"));
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleCopyClipboard = () => {
@@ -183,11 +211,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </button>
             <button
               type="button"
+              id="btn-export-to-excel-modal"
               onClick={handleDownloadCSV}
-              className="flex-1 py-2.5 rounded-full text-xs font-bold bg-[#137333] hover:bg-[#0D652D] text-white transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              disabled={exporting}
+              className="flex-1 py-2.5 rounded-full text-xs font-bold bg-[#137333] hover:bg-[#0D652D] disabled:opacity-60 text-white transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <Download size={14} />
-              <span>Export to Excel</span>
+              {exporting ? (
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : exportStatus ? (
+                <Check size={14} />
+              ) : (
+                <Download size={14} />
+              )}
+              <span>{exporting ? "Preparing..." : exportStatus ? "Export Ready" : "Export to Excel"}</span>
             </button>
           </div>
 

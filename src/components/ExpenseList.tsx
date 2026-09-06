@@ -102,13 +102,22 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
     groupedByDate[groupKey].push(item);
   });
 
-  // Export to Excel / CSV
-  const handleExportCSV = () => {
+  // Export to Excel / CSV with universal mobile support
+  const handleExportCSV = async () => {
     if (expenses.length === 0) return;
-    exportTransactionsToExcel({
-      expenses: sorted.length > 0 ? sorted : expenses,
-      segment: "expenses",
-    });
+    try {
+      const res = await exportTransactionsToExcel({
+        expenses: sorted.length > 0 ? sorted : expenses,
+        segment: "expenses",
+        format: "xlsx",
+      });
+      if (!res.success) {
+        alert("Export notice: " + (res.error || "Could not save file on this device."));
+      }
+    } catch (err: any) {
+      console.error("Expense export error:", err);
+      alert("Failed to export expenses: " + (err?.message || "Check device permissions"));
+    }
   };
 
   return (

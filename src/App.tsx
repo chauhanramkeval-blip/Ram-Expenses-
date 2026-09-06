@@ -30,6 +30,7 @@ import { MediaStorageManagerModal } from "./components/MediaStorageManagerModal"
 import { CallContactsLogModal } from "./components/CallContactsLogModal";
 import { BottomNav } from "./components/BottomNav";
 import { useRuntimePermissions } from "./hooks/useRuntimePermissions";
+import { useTheme } from "./hooks/useTheme";
 import { resolveIndianCityFromCoordinates } from "./utils/permissionManager";
 import { INITIAL_EXPENSES, INITIAL_INCOMES } from "./data/initialExpenses";
 import { CATEGORY_LIST, INCOME_CATEGORY_LIST } from "./data/categories";
@@ -95,6 +96,9 @@ const DEFAULT_SECURITY: AppSecuritySettings = {
 };
 
 export default function App() {
+  // Global Theme Mode (High-contrast Night vs Day)
+  const { isDarkMode, toggleTheme } = useTheme();
+
   // User Accounts & Authentication State
   const [users, setUsers] = useState<UserAccount[]>(getStoredUsers);
   const [currentUser, setCurrentUser] = useState<UserAccount>(getStoredCurrentUser);
@@ -1034,6 +1038,7 @@ export default function App() {
   return (
     <>
       <div
+        id="khata-app-root"
         className={`min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[#F8F9FA] text-[#202124] flex flex-col font-sans transition-all duration-300 ${
           !isLoggedIn ? "pointer-events-none select-none filter blur-[3px] opacity-60" : ""
         }`}
@@ -1075,18 +1080,20 @@ export default function App() {
         onLockSession={handleLockSession}
         isFirebaseOnline={isOnline}
         isFirebaseSynced={isFirebaseSynced}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={toggleTheme}
       />
 
       {/* Main App Canvas */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-24 sm:pb-16 overflow-x-hidden">
-        {/* Tab 1 & 2: Dedicated Transactions View (with Segmented Expenses & Income Tabs) */}
-        {(activeTab === "transactions" || activeTab === "expenses" || activeTab === "incomes") && (
+        {/* Tab 1: Dedicated Transactions View (Expenses & Cashflow) */}
+        {(activeTab === "transactions" || activeTab === "expenses") && (
           <TransactionsView
             expenses={expenses}
             incomes={incomes}
             budget={budget}
             searchQuery={searchQuery}
-            initialSegment={activeTab === "incomes" ? "income" : "expenses"}
+            initialSegment="expenses"
             currentUser={currentUser}
             onEditExpense={handleEditExpense}
             onDeleteExpense={handleDeleteExpense}
@@ -1106,6 +1113,25 @@ export default function App() {
             customIncomeCategories={customIncomeCategories}
             onOpenCategoryManager={handleOpenCategoryManager}
             onOpenExportModal={() => setIsExportModalOpen(true)}
+          />
+        )}
+
+        {/* Tab 2: Dedicated Incomes & Inflow Dashboard with Visual Charts */}
+        {activeTab === "incomes" && (
+          <IncomeView
+            incomes={incomes}
+            expenses={expenses}
+            monthlyBudget={budget.monthlyBudget}
+            searchQuery={searchQuery}
+            onEditIncome={handleEditIncome}
+            onDeleteIncome={handleDeleteIncome}
+            onOpenAddIncome={() => {
+              setEditingIncome(null);
+              setIsAddIncomeOpen(true);
+            }}
+            onNavigateToVisuals={() => setActiveTab("visuals")}
+            customIncomeCategories={customIncomeCategories}
+            onOpenCategoryManager={() => handleOpenCategoryManager("income")}
           />
         )}
 

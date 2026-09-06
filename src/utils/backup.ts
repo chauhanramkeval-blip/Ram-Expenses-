@@ -1,5 +1,6 @@
 import { Expense, Income, UserBudget, UserAccount, CategoryMeta, IncomeCategoryMeta } from "../types";
 import { formatINR } from "./formatters";
+import { deliverExportFile } from "./export";
 
 export interface KhataFullBackupData {
   version: string;
@@ -149,26 +150,20 @@ export const formatBackupSummaryText = (backup: KhataFullBackupData): string => 
 };
 
 /**
- * Triggers download of the full JSON backup file locally
+ * Triggers universal download / native mobile share of the full JSON backup file
  */
-export const downloadJsonBackupFile = (backup: KhataFullBackupData) => {
+export const downloadJsonBackupFile = async (backup: KhataFullBackupData) => {
   const jsonString = JSON.stringify(backup, null, 2);
   const blob = new Blob([jsonString], { type: "application/json;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
 
   const dateStr = new Date().toISOString().split("T")[0];
-  const safeName = (backup.user.name || "khata")
+  const safeName = (backup.user?.name || "khata")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "_")
     .replace(/_+/g, "_");
 
-  link.setAttribute("download", `Khata_Backup_${safeName}_${dateStr}.json`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  const filename = `Khata_Backup_${safeName}_${dateStr}.json`;
+  return await deliverExportFile(blob, filename, "application/json;charset=utf-8;", "Khata Full Backup");
 };
 
 /**

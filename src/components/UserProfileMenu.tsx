@@ -14,6 +14,8 @@ import {
   Edit3,
   AlertTriangle,
   KeyRound,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { UserAccount } from "../types";
 import { getInitials } from "../utils/auth";
@@ -31,6 +33,8 @@ interface UserProfileMenuProps {
   onDeleteAccount?: (user: UserAccount) => void;
   onOpenNewAccountModal?: () => void;
   onLockSession?: () => void;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
 }
 
 export const UserProfileMenu: React.FC<UserProfileMenuProps> = (props) => {
@@ -50,6 +54,8 @@ const UserProfileMenuContent: React.FC<UserProfileMenuProps> = ({
   onLogout = () => {},
   onDeleteAccount,
   onLockSession,
+  isDarkMode = false,
+  onToggleDarkMode,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -240,6 +246,43 @@ const UserProfileMenuContent: React.FC<UserProfileMenuProps> = ({
 
             {/* Quick Security & Tools Actions */}
             <div className="space-y-1 pt-1 border-t border-[#F1F3F4]">
+              {onToggleDarkMode && (
+                <button
+                  id="btn-theme-toggle-menu-item"
+                  type="button"
+                  onClick={() => {
+                    onToggleDarkMode();
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-[#202124] hover:bg-[#F1F3F4] rounded-xl transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    {isDarkMode ? (
+                      <Sun size={15} className="text-[#F9AB00]" />
+                    ) : (
+                      <Moon size={15} className="text-[#5F6368]" />
+                    )}
+                    <span>{isDarkMode ? "Night Mode (Dark Theme)" : "Day Mode (Light Theme)"}</span>
+                  </div>
+                  <div
+                    className={`w-9 h-5 rounded-full transition-colors relative flex items-center px-0.5 ${
+                      isDarkMode ? "bg-[#1A73E8]" : "bg-[#DADCE0]"
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white transition-transform shadow-xs flex items-center justify-center ${
+                        isDarkMode ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    >
+                      {isDarkMode ? (
+                        <Moon size={10} className="text-[#1A73E8]" />
+                      ) : (
+                        <Sun size={10} className="text-[#F9AB00]" />
+                      )}
+                    </div>
+                  </div>
+                </button>
+              )}
+
               {onLockSession && (
                 <button
                   id="btn-lock-session-menu-item"
