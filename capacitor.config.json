@@ -1,6 +1,6 @@
 {
   "appId": "com.khata.financeadvisor",
-  "appName": "Khata: Daily Expense & Finance Advisor",
+  "appName": "Ramc-expenses",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
