@@ -41,7 +41,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     return expenses;
   };
 
-  const handleDownloadCSV = async () => {
+  const handleExport = async (format: "xlsx" | "csv" = "xlsx") => {
     const data = getExportData();
     if (data.length === 0) {
       alert("No records to export in the selected range.");
@@ -55,13 +55,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         expenses: data,
         user: currentUser,
         segment: "expenses",
-        format: "xlsx",
+        format: format,
       });
 
       if (!res.success) {
         alert("Export failed: " + (res.error || "Could not save file on this device."));
       } else {
-        setExportStatus(res.action === "shared" ? "File shared successfully!" : `Downloaded ${res.filename}`);
+        setExportStatus(
+          res.action === "shared"
+            ? "File shared successfully!"
+            : `Downloaded ${res.filename}`
+        );
         setTimeout(() => {
           setExportStatus(null);
           onClose();
@@ -200,30 +204,43 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </div>
           </div>
 
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={handleCopyClipboard}
-              className="flex-1 py-2.5 rounded-full text-xs font-bold border border-[#DADCE0] hover:bg-[#F1F3F4] text-[#3C4043] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              {copied ? <Check size={14} className="text-[#137333]" /> : <FileText size={14} />}
-              <span>{copied ? "Copied CSV" : "Copy to Clipboard"}</span>
-            </button>
+          <div className="grid grid-cols-2 gap-2 pt-2">
             <button
               type="button"
               id="btn-export-to-excel-modal"
-              onClick={handleDownloadCSV}
+              onClick={() => handleExport("xlsx")}
               disabled={exporting}
-              className="flex-1 py-2.5 rounded-full text-xs font-bold bg-[#137333] hover:bg-[#0D652D] disabled:opacity-60 text-white transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              className="py-2.5 px-3 rounded-full text-xs font-bold bg-[#137333] hover:bg-[#0D652D] disabled:opacity-60 text-white transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
             >
               {exporting ? (
                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : exportStatus ? (
                 <Check size={14} />
               ) : (
-                <Download size={14} />
+                <FileSpreadsheet size={14} />
               )}
-              <span>{exporting ? "Preparing..." : exportStatus ? "Export Ready" : "Export to Excel"}</span>
+              <span>{exporting ? "Preparing..." : "Excel (.xlsx)"}</span>
+            </button>
+            <button
+              type="button"
+              id="btn-export-to-csv-modal"
+              onClick={() => handleExport("csv")}
+              disabled={exporting}
+              className="py-2.5 px-3 rounded-full text-xs font-bold bg-[#1A73E8] hover:bg-[#1557B0] disabled:opacity-60 text-white transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Download size={14} />
+              <span>CSV (.csv)</span>
+            </button>
+          </div>
+
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={handleCopyClipboard}
+              className="w-full py-2 rounded-full text-xs font-semibold border border-[#DADCE0] hover:bg-[#F1F3F4] text-[#3C4043] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              {copied ? <Check size={14} className="text-[#137333]" /> : <FileText size={14} />}
+              <span>{copied ? "Copied CSV to Clipboard" : "Copy CSV to Clipboard"}</span>
             </button>
           </div>
 

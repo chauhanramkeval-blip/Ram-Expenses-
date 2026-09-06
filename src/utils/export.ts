@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { Expense, Income, UserAccount } from "../types";
+import { deliverFileViaExternalChrome, isMobileOrWebView } from "./externalLauncher";
 
 export interface ExportRecord {
   id: string;
@@ -124,27 +125,53 @@ function escapeCSVCell(value: string | number | undefined | null): string {
 
 export interface DeliverFileResult {
   success: boolean;
-  action: "shared" | "downloaded";
+  action: "shared" | "downloaded" | "external_chrome";
   filename: string;
   error?: string;
 }
 
 /**
- * Universal Mobile-Friendly File Delivery:
- * 1. Checks if the device is a mobile app / supports navigator.canShare with files.
- * 2. If supported, uses navigator.share({ files: [file], title: ... }) so Android APK / WebView / Mobile
- *    opens the native share/save sheet (Save to device storage, Google Drive, WhatsApp, Excel, etc.).
- * 3. If navigator.share fails, is dismissed, or is unsupported, falls back to standard Blob URL download
- *    with explicit MIME types (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet or text/csv).
- * 4. Provides comprehensive error reporting for WebView environments.
+ * Universal High-Reliability File Delivery:
+ * 1. Standard Direct W3C HTML5 Blob Anchor Download (Immediate, offline-capable, writes directly to device Downloads folder)
+ * 2. Mobile Native Share Sheet (navigator.share) fallback if requested or if download click is intercepted in restricted mobile contexts
+ * 3. Base64 Data URI fallback if Blob URL is blocked
  */
 export async function deliverExportFile(
   blob: Blob,
   filename: string,
   mimeType: string,
-  title: string = "Khata Export"
+  title: string = "Khata Export",
+  userId?: string
 ): Promise<DeliverFileResult> {
-  // 1. Try Native Mobile Web Share API with File object (Android WebView / APK / Chrome Mobile / PWA)
+  // 1. Primary Strategy: Direct HTML5 Blob URL Anchor Download
+  try {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+
+    setTimeout(() => {
+      try {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+        URL.revokeObjectURL(url);
+      } catch {}
+    }, 2000);
+
+    return {
+      success: true,
+      action: "downloaded",
+      filename,
+    };
+  } catch (blobErr) {
+    console.warn("Direct blob download failed, trying native share / data URI fallback:", blobErr);
+  }
+
+  // 2. Native Mobile Web Share API with File object
   let file: File | null = null;
   try {
     if (typeof File !== "undefined") {
@@ -177,7 +204,6 @@ export async function deliverExportFile(
         };
       }
     } catch (shareErr: any) {
-      // If the user cancelled/closed the native Android share sheet, treat as handled
       if (shareErr?.name === "AbortError") {
         return {
           success: true,
@@ -185,15 +211,21 @@ export async function deliverExportFile(
           filename,
         };
       }
-      console.warn("navigator.share encountered an error, attempting Blob download fallback:", shareErr);
+      console.warn("navigator.share failed, trying Data URL fallback:", shareErr);
     }
   }
 
-  // 2. Fallback: Standard Blob URL Anchor Download with explicit MIME type
+  // 3. Fallback: Base64 Data URI download
   try {
-    const url = URL.createObjectURL(blob);
+    const reader = new FileReader();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
     const link = document.createElement("a");
-    link.href = url;
+    link.href = dataUrl;
     link.setAttribute("download", filename);
     link.style.display = "none";
     document.body.appendChild(link);
@@ -204,9 +236,8 @@ export async function deliverExportFile(
         if (document.body.contains(link)) {
           document.body.removeChild(link);
         }
-        URL.revokeObjectURL(url);
       } catch {}
-    }, 1500);
+    }, 2000);
 
     return {
       success: true,
@@ -214,12 +245,12 @@ export async function deliverExportFile(
       filename,
     };
   } catch (downloadErr: any) {
-    console.error("Standard blob download failed in WebView:", downloadErr);
+    console.error("All export download methods failed:", downloadErr);
     return {
       success: false,
       action: "downloaded",
       filename,
-      error: downloadErr?.message || "File download could not be completed in this WebView.",
+      error: downloadErr?.message || "File download could not be completed on this device.",
     };
   }
 }
@@ -249,7 +280,7 @@ export async function exportTransactionsToExcel({
   success: boolean;
   filename: string;
   count: number;
-  action: "shared" | "downloaded";
+  action: "shared" | "downloaded" | "external_chrome";
   error?: string;
 }> {
   const expenseRecords: ExportRecord[] = [];
@@ -327,7 +358,7 @@ export async function exportTransactionsToExcel({
     const filename = `Khata_${segment === "expenses" ? "Expenses" : segment === "income" ? "Income" : "Statement"}_${sanitizedUserName}_${currentDateStr}.csv`;
     const csvBlob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
 
-    const delivery = await deliverExportFile(csvBlob, filename, "text/csv;charset=utf-8;", "Khata CSV Statement");
+    const delivery = await deliverExportFile(csvBlob, filename, "text/csv;charset=utf-8;", "Khata CSV Statement", user?.id);
 
     return {
       success: delivery.success,
@@ -538,7 +569,8 @@ export async function exportTransactionsToExcel({
     excelBlob,
     filename,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "Khata Financial Statement"
+    "Khata Financial Statement",
+    user?.id
   );
 
   return {

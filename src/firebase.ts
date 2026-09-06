@@ -5,6 +5,8 @@ import {
   Auth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut as fbSignOut,
   onAuthStateChanged,
   User as FirebaseUser,
@@ -22,18 +24,20 @@ export interface FirebaseConfig {
   oAuthClientId?: string;
 }
 
+export const FIREBASE_AUTH_HANDLER_URL = "https://potent-crossbar-wtvkm.firebaseapp.com/__/auth/handler";
+
 const LOCAL_STORAGE_CUSTOM_FIREBASE_KEY = "khata_custom_firebase_config_v1";
 
-// Default placeholder config or loaded from provisioning
+// Default standard Firebase configuration
 export const DEFAULT_FIREBASE_CONFIG: FirebaseConfig = {
-  apiKey: appletConfig?.apiKey || "AIzaSy_YOUR_API_KEY_HERE",
-  authDomain: appletConfig?.authDomain || "your-app.firebaseapp.com",
-  projectId: appletConfig?.projectId || "your-project-id",
-  storageBucket: appletConfig?.storageBucket || "your-app.firebasestorage.app",
-  messagingSenderId: appletConfig?.messagingSenderId || "123456789012",
-  appId: appletConfig?.appId || "1:123456789012:web:abcdef123456",
-  firestoreDatabaseId: appletConfig?.firestoreDatabaseId || "",
-  oAuthClientId: appletConfig?.oAuthClientId || "",
+  apiKey: appletConfig?.apiKey || "AIzaSyANlA5P0E9CdFAZdU4im_wCEtWCOuh0MiE",
+  authDomain: appletConfig?.authDomain || "potent-crossbar-wtvkm.firebaseapp.com",
+  projectId: appletConfig?.projectId || "potent-crossbar-wtvkm",
+  storageBucket: appletConfig?.storageBucket || "potent-crossbar-wtvkm.firebasestorage.app",
+  messagingSenderId: appletConfig?.messagingSenderId || "614702205249",
+  appId: appletConfig?.appId || "1:614702205249:web:19b32e4b9710e3d8a979c0",
+  firestoreDatabaseId: appletConfig?.firestoreDatabaseId || "ai-studio-khatadailyexpens-0f48481c-7d95-47ea-9afe-1cee316e57ec",
+  oAuthClientId: appletConfig?.oAuthClientId || "614702205249-g9lsbllrcsog7m56pr3g2frkhj9qid78.apps.googleusercontent.com",
 };
 
 /**
@@ -45,7 +49,11 @@ export const getActiveFirebaseConfig = (): FirebaseConfig => {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && typeof parsed === "object" && parsed.apiKey && parsed.projectId) {
-        return parsed;
+        return {
+          ...DEFAULT_FIREBASE_CONFIG,
+          ...parsed,
+          authDomain: DEFAULT_FIREBASE_CONFIG.authDomain,
+        };
       }
     }
   } catch (e) {
@@ -178,6 +186,17 @@ export const getFirebaseAuth = (): Auth | null => {
 };
 
 /**
+ * Builds the standard Google Auth Provider configured for clean Web-based authentication
+ */
+export const createGoogleAuthProvider = (): GoogleAuthProvider => {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({
+    prompt: "select_account",
+  });
+  return provider;
+};
+
+/**
  * Sign in using Firebase Google Auth with popup
  */
 export const signInWithGooglePopup = async (): Promise<{
@@ -190,8 +209,7 @@ export const signInWithGooglePopup = async (): Promise<{
     return { success: false, error: "Firebase Authentication is not ready." };
   }
   try {
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
+    const provider = createGoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
     return { success: true, firebaseUser: result.user };
   } catch (err: any) {
@@ -199,6 +217,57 @@ export const signInWithGooglePopup = async (): Promise<{
     return {
       success: false,
       error: err?.message || "Google sign-in popup was cancelled or failed.",
+    };
+  }
+};
+
+/**
+ * Sign in using standard Web-based OAuth redirect (fallback)
+ */
+export const signInWithGoogleRedirect = async (): Promise<{
+  success: boolean;
+  error?: string;
+}> => {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    return { success: false, error: "Firebase Authentication is not ready." };
+  }
+  try {
+    const provider = createGoogleAuthProvider();
+    await signInWithRedirect(auth, provider);
+    return { success: true };
+  } catch (err: any) {
+    console.warn("Google Sign-In redirect error:", err);
+    return {
+      success: false,
+      error: err?.message || "Google sign-in redirect failed.",
+    };
+  }
+};
+
+/**
+ * Checks for any pending OAuth redirect result after page load
+ */
+export const checkGoogleRedirectResult = async (): Promise<{
+  success: boolean;
+  firebaseUser?: FirebaseUser;
+  error?: string;
+}> => {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    return { success: false, error: "Firebase Authentication is not ready." };
+  }
+  try {
+    const result = await getRedirectResult(auth);
+    if (result && result.user) {
+      return { success: true, firebaseUser: result.user };
+    }
+    return { success: false };
+  } catch (err: any) {
+    console.warn("Google redirect check notice:", err);
+    return {
+      success: false,
+      error: err?.message || "Redirect authentication could not be completed.",
     };
   }
 };

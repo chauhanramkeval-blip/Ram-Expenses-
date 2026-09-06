@@ -807,10 +807,288 @@ Return ONLY a valid JSON array of objects matching this schema. If no transactio
       incomesCount: 2,
       expensesCount: 3,
       incomesTotal: 80000,
-      expensesTotal: 2975,
       fallbackUsed: true,
       notice: "Extracted statement preview with automatic category tagging.",
     });
+  }
+});
+
+// =========================================================================
+// 9. API: Secure External Browser File Download Staging & Token Store
+// =========================================================================
+interface StagedDownloadItem {
+  token: string;
+  filename: string;
+  mimeType: string;
+  data: string; // Base64 or text payload
+  isBase64: boolean;
+  userId?: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+const stagedDownloadStore: Record<string, StagedDownloadItem> = {};
+
+// Clean up expired downloads periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const token in stagedDownloadStore) {
+    if (stagedDownloadStore[token].expiresAt < now) {
+      delete stagedDownloadStore[token];
+    }
+  }
+}, 60 * 1000);
+
+// POST: Stage a file for external Chrome browser download with a signed token
+app.post("/api/download/stage", (req, res) => {
+  try {
+    const { filename = "Khata_Export.xlsx", mimeType = "application/octet-stream", data, isBase64 = true, userId } = req.body || {};
+
+    if (!data) {
+      return res.status(400).json({ success: false, error: "File data is required for download staging." });
+    }
+
+    const token = `dl_${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
+    const ttlMs = 15 * 60 * 1000; // 15 minutes TTL
+
+    stagedDownloadStore[token] = {
+      token,
+      filename,
+      mimeType,
+      data,
+      isBase64: Boolean(isBase64),
+      userId,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + ttlMs,
+    };
+
+    return res.json({
+      success: true,
+      token,
+      filename,
+      downloadUrl: `/api/download/file/${token}`,
+      webDownloadUrl: `/download?token=${token}`,
+      expiresAt: Date.now() + ttlMs,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Failed to stage file download." });
+  }
+});
+
+// GET: Direct stream/attachment endpoint for external Chrome browser
+app.get("/api/download/file/:token", (req, res) => {
+  try {
+    const { token } = req.params;
+    const item = stagedDownloadStore[token];
+
+    if (!item) {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html>
+          <head><title>Download Expired</title><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 40px 20px; background: #F8F9FA; color: #202124;">
+            <div style="max-width: 420px; margin: auto; background: white; padding: 32px; border-radius: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #E8EAED;">
+              <h2 style="color: #EA4335; margin-bottom: 8px;">Download Expired</h2>
+              <p style="color: #5F6368; font-size: 14px; line-height: 1.6;">This temporary file download link has expired or was already downloaded. Please return to the Ram Expenses app and request a new export.</p>
+              <a href="/" style="display: inline-block; margin-top: 16px; padding: 12px 24px; background: #1A73E8; color: white; border-radius: 99px; text-decoration: none; font-weight: bold; font-size: 14px;">Return to Ram Expenses</a>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+
+    if (item.expiresAt < Date.now()) {
+      delete stagedDownloadStore[token];
+      return res.status(410).send("Download link expired. Please generate a new export.");
+    }
+
+    // Set standard RFC 6266 attachment headers for seamless Chrome auto-download
+    const safeFilename = item.filename.replace(/["\r\n]/g, "_");
+    const encodedFilename = encodeURIComponent(item.filename);
+
+    res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodedFilename}`);
+    res.setHeader("Content-Type", item.mimeType || "application/octet-stream");
+    res.setHeader("Cache-Control", "private, no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+
+    if (item.isBase64) {
+      const buffer = Buffer.from(item.data, "base64");
+      res.setHeader("Content-Length", buffer.length);
+      return res.end(buffer);
+    } else {
+      res.setHeader("Content-Length", Buffer.byteLength(item.data, "utf-8"));
+      return res.end(item.data);
+    }
+  } catch (err: any) {
+    console.error("File download delivery error:", err);
+    return res.status(500).send("Error generating file download.");
+  }
+});
+
+// GET: Metadata info about a staged file
+app.get("/api/download/info/:token", (req, res) => {
+  const { token } = req.params;
+  const item = stagedDownloadStore[token];
+  if (!item || item.expiresAt < Date.now()) {
+    return res.status(404).json({ success: false, error: "Download token not found or expired." });
+  }
+  const sizeBytes = item.isBase64 ? Buffer.from(item.data, "base64").length : Buffer.byteLength(item.data, "utf-8");
+  return res.json({
+    success: true,
+    filename: item.filename,
+    mimeType: item.mimeType,
+    fileSizeBytes: sizeBytes,
+    expiresAt: item.expiresAt,
+    directDownloadUrl: `/api/download/file/${token}`,
+  });
+});
+
+// =========================================================================
+// 10. API: Web Authentication Ticket Handshake & Session Exchange
+// =========================================================================
+interface WebAuthTicketItem {
+  ticket: string;
+  authCode: string; // 6-digit confirmation code
+  status: "pending" | "authenticated" | "consumed";
+  user?: any;
+  userHint?: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+const authTicketStore: Record<string, WebAuthTicketItem> = {};
+
+// Clean up expired tickets
+setInterval(() => {
+  const now = Date.now();
+  for (const ticket in authTicketStore) {
+    if (authTicketStore[ticket].expiresAt < now) {
+      delete authTicketStore[ticket];
+    }
+  }
+}, 60 * 1000);
+
+// POST: Create a web login session ticket for Chrome authentication
+app.post("/api/auth/web-ticket/create", (req, res) => {
+  try {
+    const { userHint } = req.body || {};
+    const ticket = `auth_${Date.now()}_${crypto.randomBytes(12).toString("hex")}`;
+    const authCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code e.g. "849201"
+    const ttlMs = 10 * 60 * 1000; // 10 minutes
+
+    authTicketStore[ticket] = {
+      ticket,
+      authCode,
+      status: "pending",
+      userHint,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + ttlMs,
+    };
+
+    return res.json({
+      success: true,
+      ticket,
+      authCode,
+      webLoginUrl: `/web-login?ticket=${ticket}`,
+      expiresAt: Date.now() + ttlMs,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Failed to create web auth ticket." });
+  }
+});
+
+// GET: Check status of web authentication ticket (polled by mobile app)
+app.get("/api/auth/web-ticket/status/:ticket", (req, res) => {
+  const { ticket } = req.params;
+  const item = authTicketStore[ticket];
+
+  if (!item) {
+    return res.status(404).json({ success: false, status: "expired", error: "Ticket not found or expired." });
+  }
+
+  if (item.expiresAt < Date.now()) {
+    delete authTicketStore[ticket];
+    return res.json({ success: false, status: "expired" });
+  }
+
+  return res.json({
+    success: true,
+    status: item.status,
+    authCode: item.authCode,
+    user: item.user,
+  });
+});
+
+// POST: Complete web login in Chrome browser and authenticate the ticket
+app.post("/api/auth/web-ticket/complete", (req, res) => {
+  try {
+    const { ticket, user } = req.body || {};
+
+    if (!ticket || !user) {
+      return res.status(400).json({ success: false, error: "ticket and user data are required." });
+    }
+
+    const item = authTicketStore[ticket];
+    if (!item) {
+      return res.status(404).json({ success: false, error: "Authentication ticket has expired or is invalid." });
+    }
+
+    // Mark as authenticated with user profile payload
+    item.status = "authenticated";
+    item.user = user;
+
+    const redirectUrl = "/";
+    const authHandlerUrl = "https://potent-crossbar-wtvkm.firebaseapp.com/__/auth/handler";
+
+    return res.json({
+      success: true,
+      authCode: item.authCode,
+      redirectUrl,
+      authHandlerUrl,
+      message: "Authentication successful. Ready for session handover.",
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Failed to complete web authentication." });
+  }
+});
+
+// POST: Verify 6-digit confirmation code entered in app
+app.post("/api/auth/web-ticket/verify-code", (req, res) => {
+  try {
+    const { authCode } = req.body || {};
+    if (!authCode) {
+      return res.status(400).json({ success: false, error: "authCode is required." });
+    }
+
+    const cleanCode = String(authCode).trim();
+    let foundTicket: WebAuthTicketItem | null = null;
+
+    for (const key in authTicketStore) {
+      const item = authTicketStore[key];
+      if (item.authCode === cleanCode && item.expiresAt > Date.now()) {
+        foundTicket = item;
+        break;
+      }
+    }
+
+    if (!foundTicket || !foundTicket.user) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid or expired confirmation code. Please complete authentication in Chrome first.",
+      });
+    }
+
+    foundTicket.status = "consumed";
+    const userPayload = foundTicket.user;
+
+    return res.json({
+      success: true,
+      user: userPayload,
+      message: "Session handover confirmed successfully.",
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || "Failed to verify code." });
   }
 });
 

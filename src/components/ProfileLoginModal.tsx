@@ -17,6 +17,8 @@ import {
   Sparkles,
   ArrowRight,
   ChevronDown,
+  Compass,
+  ExternalLink,
 } from "lucide-react";
 import { UserAccount } from "../types";
 import {
@@ -29,6 +31,14 @@ import {
 } from "../utils/auth";
 import { triggerBiometricAuthentication } from "../utils/biometrics";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { signInWithGooglePopup, checkGoogleRedirectResult } from "../firebase";
+import {
+  createWebAuthTicket,
+  openInExternalChromeBrowser,
+  checkWebAuthStatus,
+  verifyWebAuthCode,
+  WebAuthSession,
+} from "../utils/externalLauncher";
 
 interface ProfileLoginModalProps {
   isOpen: boolean;
@@ -82,6 +92,12 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [isBioLoading, setIsBioLoading] = useState<boolean>(false);
   const [showUserDropdown, setShowUserDropdown] = useState<boolean>(false);
+
+  // Chrome Web Auth state
+  const [activeWebAuthSession, setActiveWebAuthSession] = useState<WebAuthSession | null>(null);
+  const [isLaunchingChrome, setIsLaunchingChrome] = useState<boolean>(false);
+  const [manualCode, setManualCode] = useState<string>("");
+  const [isVerifyingCode, setIsVerifyingCode] = useState<boolean>(false);
 
   // Forgot PIN State
   const [showForgotModal, setShowForgotModal] = useState<boolean>(false);
@@ -225,12 +241,122 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
     }
   };
 
-  // Handle Google 1-Click OAuth Verification
-  const handleGoogleVerify = () => {
-    setIsSuccess(true);
-    setTimeout(() => {
-      onAuthenticated(selectedUser);
-    }, 400);
+  // Check for completed Google Redirect Result on mount
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    checkGoogleRedirectResult().then((res) => {
+      if (!isMounted) return;
+      if (res.success && res.firebaseUser) {
+        setIsSuccess(true);
+        setTimeout(() => {
+          onAuthenticated(selectedUser);
+        }, 300);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, selectedUser, onAuthenticated]);
+
+  // Handle Google 1-Click OAuth Verification via Firebase Web Auth
+  const handleGoogleVerify = async () => {
+    setIsBioLoading(true);
+    setErrorMessage("");
+    try {
+      const res = await signInWithGooglePopup();
+      if (res.success && res.firebaseUser) {
+        setIsSuccess(true);
+        setTimeout(() => {
+          onAuthenticated(selectedUser);
+        }, 400);
+      } else if (res.error) {
+        setErrorMessage(res.error);
+      }
+    } catch (e: any) {
+      setErrorMessage(e?.message || "Google Authentication failed.");
+    } finally {
+      setIsBioLoading(false);
+    }
+  };
+
+  // Launch Chrome External Login
+  const handleLaunchChromeAuth = async () => {
+    setIsLaunchingChrome(true);
+    setErrorMessage("");
+    setManualCode("");
+
+    try {
+      const session = await createWebAuthTicket(selectedUser?.email);
+      if (!session) {
+        setErrorMessage("Could not initialize external web authentication session.");
+        setIsLaunchingChrome(false);
+        return;
+      }
+      setActiveWebAuthSession(session);
+      openInExternalChromeBrowser(session.webLoginUrl);
+    } catch (err: any) {
+      setErrorMessage("Could not launch Google Chrome. Please use PIN or biometric.");
+    } finally {
+      setIsLaunchingChrome(false);
+    }
+  };
+
+  // Poll for external Chrome authentication completion
+  useEffect(() => {
+    if (!activeWebAuthSession || !isOpen) return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const result = await checkWebAuthStatus(activeWebAuthSession.ticket);
+        if (!isMounted) return;
+
+        if (result.status === "authenticated" && result.user) {
+          clearInterval(interval);
+          setActiveWebAuthSession(null);
+          setIsSuccess(true);
+          setTimeout(() => {
+            onAuthenticated(selectedUser);
+          }, 400);
+        }
+      } catch (err) {
+        console.warn("Chrome status poll error:", err);
+      }
+    }, 1600);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [activeWebAuthSession, isOpen, selectedUser, onAuthenticated]);
+
+  // Handle manual 6-digit code verification
+  const handleVerifyManualCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualCode.trim() || manualCode.trim().length !== 6) {
+      setErrorMessage("Please enter the 6-digit code shown in Chrome.");
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    setErrorMessage("");
+    try {
+      const result = await verifyWebAuthCode(manualCode.trim());
+      if (result.success && result.user) {
+        setActiveWebAuthSession(null);
+        setIsSuccess(true);
+        setTimeout(() => {
+          onAuthenticated(selectedUser);
+        }, 400);
+      } else {
+        setErrorMessage(result.error || "Invalid confirmation code.");
+      }
+    } catch {
+      setErrorMessage("Code verification failed.");
+    } finally {
+      setIsVerifyingCode(false);
+    }
   };
 
   // Quick fill helper for effortless testing
@@ -632,7 +758,7 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
               </form>
             )}
 
-            {/* TAB 3: Fast Unlock / Biometric / Google */}
+            {/* TAB 3: Fast Unlock / Biometric / Google / Chrome */}
             {authMethod === "google" && (
               <div className="py-2 space-y-3">
                 <button
@@ -640,7 +766,7 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
                   id="btn-biometric-verify"
                   onClick={handleBiometricAuth}
                   disabled={isBioLoading}
-                  className="w-full p-3.5 bg-[#E8F0FE] hover:bg-[#D2E3FC] text-[#1A73E8] rounded-2xl border border-[#D2E3FC] font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-2xs cursor-pointer"
+                  className="w-full p-3 bg-[#E8F0FE] hover:bg-[#D2E3FC] text-[#1A73E8] rounded-2xl border border-[#D2E3FC] font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-2xs cursor-pointer"
                 >
                   <Fingerprint size={20} className={isBioLoading ? "animate-pulse" : ""} />
                   <span>{isBioLoading ? "Verifying Sensor..." : "Unlock with Fingerprint / Biometrics"}</span>
@@ -648,14 +774,68 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
 
                 <button
                   type="button"
+                  id="btn-chrome-verify-profile"
+                  onClick={handleLaunchChromeAuth}
+                  disabled={isLaunchingChrome}
+                  className="w-full p-3 bg-white hover:bg-[#F8F9FA] text-[#1A73E8] rounded-2xl border border-[#DADCE0] font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-2xs cursor-pointer"
+                >
+                  {isLaunchingChrome ? (
+                    <div className="w-4 h-4 border-2 border-[#1A73E8] border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Compass size={18} className="text-[#1A73E8]" />
+                  )}
+                  <span>Log In via Chrome / Web Browser</span>
+                  <ExternalLink size={13} className="text-[#5F6368]" />
+                </button>
+
+                {/* Active Chrome handshake box */}
+                {activeWebAuthSession && (
+                  <div className="p-3 bg-[#E8F0FE]/80 rounded-2xl border border-[#D2E3FC] space-y-2.5 animate-fadeIn">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3.5 h-3.5 border-2 border-[#1A73E8] border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs font-bold text-[#1A73E8]">Waiting for Chrome login...</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveWebAuthSession(null)}
+                        className="text-[10px] text-[#5F6368] hover:text-[#C5221F] px-1.5 py-0.5 rounded bg-white border border-[#DADCE0]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleVerifyManualCode} className="flex gap-2">
+                      <input
+                        type="text"
+                        maxLength={6}
+                        inputMode="numeric"
+                        value={manualCode}
+                        onChange={(e) => setManualCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        placeholder="6-digit code"
+                        className="flex-1 px-3 py-1.5 text-center text-xs font-mono font-bold bg-white text-[#202124] rounded-xl border border-[#DADCE0] outline-none"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isVerifyingCode || manualCode.length !== 6}
+                        className="px-3 py-1.5 bg-[#1A73E8] disabled:opacity-50 text-white font-bold text-xs rounded-xl"
+                      >
+                        {isVerifyingCode ? "..." : "Verify"}
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                <button
+                  type="button"
                   id="btn-google-verify"
                   onClick={handleGoogleVerify}
-                  className="w-full p-3.5 bg-white hover:bg-[#F8F9FA] text-[#202124] rounded-2xl border border-[#DADCE0] font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-2xs cursor-pointer"
+                  className="w-full p-3 bg-white hover:bg-[#F8F9FA] text-[#202124] rounded-2xl border border-[#DADCE0] font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-2xs cursor-pointer"
                 >
                   <div className="w-4 h-4 rounded-full flex items-center justify-center font-bold text-[10px] text-[#1A73E8]">
                     G
                   </div>
-                  <span>1-Click Google Verification ({selectedUser.email})</span>
+                  <span>1-Click Direct Unlock ({selectedUser.name})</span>
                 </button>
 
                 {errorMessage && (

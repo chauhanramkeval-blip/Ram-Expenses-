@@ -163,7 +163,7 @@ export const downloadJsonBackupFile = async (backup: KhataFullBackupData) => {
     .replace(/_+/g, "_");
 
   const filename = `Khata_Backup_${safeName}_${dateStr}.json`;
-  return await deliverExportFile(blob, filename, "application/json;charset=utf-8;", "Khata Full Backup");
+  return await deliverExportFile(blob, filename, "application/json;charset=utf-8;", "Khata Full Backup", backup.user?.id);
 };
 
 /**

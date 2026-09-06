@@ -29,6 +29,8 @@ import { VoiceLoggerModal } from "./components/VoiceLoggerModal";
 import { SmsBankReaderModal } from "./components/SmsBankReaderModal";
 import { MediaStorageManagerModal } from "./components/MediaStorageManagerModal";
 import { CallContactsLogModal } from "./components/CallContactsLogModal";
+import { WebDownloadLanding } from "./components/WebDownloadLanding";
+import { WebLoginLanding } from "./components/WebLoginLanding";
 import { BottomNav } from "./components/BottomNav";
 import { useRuntimePermissions } from "./hooks/useRuntimePermissions";
 import { useTheme } from "./hooks/useTheme";
@@ -108,6 +110,19 @@ const DEFAULT_SECURITY: AppSecuritySettings = {
 export default function App() {
   // Global Theme Mode (High-contrast Night vs Day)
   const { isDarkMode, toggleTheme } = useTheme();
+
+  // URL Route Detection for External Chrome Landing Pages
+  const [currentPath, setCurrentPath] = useState(() => typeof window !== "undefined" ? window.location.pathname : "/");
+  const [searchParams, setSearchParams] = useState(() => typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams());
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+      setSearchParams(new URLSearchParams(window.location.search));
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // User Accounts & Authentication State
   const [users, setUsers] = useState<UserAccount[]>(getStoredUsers);
@@ -1149,6 +1164,42 @@ export default function App() {
       setDeferredPrompt(null);
     }
   };
+
+  // Route: External Chrome Download Landing
+  const tokenFromParam = searchParams.get("token") || searchParams.get("downloadToken");
+  const tokenFromPath = currentPath.startsWith("/download/") ? currentPath.replace("/download/", "") : "";
+  const effectiveDownloadToken = tokenFromParam || tokenFromPath;
+
+  if (currentPath.startsWith("/download") || (tokenFromParam && tokenFromParam.length > 0)) {
+    return (
+      <WebDownloadLanding
+        token={effectiveDownloadToken}
+        onNavigateHome={() => {
+          window.history.pushState({}, "", "/");
+          setCurrentPath("/");
+          setSearchParams(new URLSearchParams());
+        }}
+      />
+    );
+  }
+
+  // Route: External Chrome Web Login Landing
+  const ticketFromParam = searchParams.get("ticket") || searchParams.get("webTicket");
+  const ticketFromPath = currentPath.startsWith("/web-login/") ? currentPath.replace("/web-login/", "") : "";
+  const effectiveWebTicket = ticketFromParam || ticketFromPath;
+
+  if (currentPath.startsWith("/web-login") || (ticketFromParam && ticketFromParam.length > 0)) {
+    return (
+      <WebLoginLanding
+        ticket={effectiveWebTicket}
+        onNavigateHome={() => {
+          window.history.pushState({}, "", "/");
+          setCurrentPath("/");
+          setSearchParams(new URLSearchParams());
+        }}
+      />
+    );
+  }
 
   return (
     <>

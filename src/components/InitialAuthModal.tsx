@@ -20,6 +20,10 @@ import {
   ChevronRight,
   RefreshCw,
   CloudCheck,
+  Compass,
+  ExternalLink,
+  Copy,
+  Smartphone,
 } from "lucide-react";
 import { UserAccount } from "../types";
 import {
@@ -34,8 +38,15 @@ import {
   upsertUserAccount,
 } from "../utils/auth";
 import { triggerBiometricAuthentication } from "../utils/biometrics";
-import { signInWithGooglePopup } from "../firebase";
+import { signInWithGooglePopup, checkGoogleRedirectResult } from "../firebase";
 import { syncUserProfileToFirestore } from "../services/firestoreSync";
+import {
+  createWebAuthTicket,
+  openInExternalChromeBrowser,
+  checkWebAuthStatus,
+  verifyWebAuthCode,
+  WebAuthSession,
+} from "../utils/externalLauncher";
 
 interface InitialAuthModalProps {
   isOpen: boolean;
@@ -80,6 +91,12 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
   const [isShaking, setIsShaking] = useState(false);
   const [isBioLoading, setIsBioLoading] = useState(false);
   const [isGoogleAuthLoading, setIsGoogleAuthLoading] = useState(false);
+
+  // Chrome Web Auth Handshake State
+  const [activeWebAuthSession, setActiveWebAuthSession] = useState<WebAuthSession | null>(null);
+  const [isLaunchingChrome, setIsLaunchingChrome] = useState(false);
+  const [manualAuthCode, setManualAuthCode] = useState("");
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
 
   // Common UI State
   const [errorMessage, setErrorMessage] = useState("");
@@ -166,6 +183,65 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, mode, loginMethod, loginPin, successMessage]);
+
+  // Check for completed Google Redirect Result on mount
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let isMounted = true;
+    checkGoogleRedirectResult().then((res) => {
+      if (!isMounted) return;
+      if (res.success && res.firebaseUser) {
+        const fbUser = res.firebaseUser;
+        const userEmail = (fbUser.email || "").trim().toLowerCase();
+        const userDisplayName = fbUser.displayName || userEmail.split("@")[0] || "Khata User";
+        const permanentUid = fbUser.uid;
+
+        const existingUser =
+          findExistingUser(userEmail, allUsers) ||
+          findExistingUser(permanentUid, allUsers);
+
+        if (existingUser) {
+          const updatedUser: UserAccount = {
+            ...existingUser,
+            lastLogin: "Active Now",
+            authProvider: "google",
+            avatarColor: existingUser.avatarColor || "#1A73E8",
+          };
+          upsertUserAccount(updatedUser);
+          syncUserProfileToFirestore(updatedUser).catch(() => {});
+          setSuccessMessage(`Welcome back, ${existingUser.name}!`);
+          setOnboardingCompleted(true);
+          setStoredAuthState(true);
+          setTimeout(() => onLogin(updatedUser), 300);
+        } else {
+          const newUser: UserAccount = {
+            id: permanentUid,
+            name: userDisplayName,
+            email: userEmail,
+            phone: fbUser.phoneNumber || "+91 98765 43210",
+            accountType: "Personal",
+            avatarColor: "#1A73E8",
+            joinedDate: "Today",
+            lastLogin: "Active Now",
+            authProvider: "google",
+            pin: "1234",
+            password: "khata",
+          };
+          upsertUserAccount(newUser);
+          syncUserProfileToFirestore(newUser).catch(() => {});
+          setSuccessMessage(`Google Verified! Welcome, ${newUser.name}!`);
+          setOnboardingCompleted(true);
+          setStoredAuthState(true);
+          setTimeout(() => onSignUp(newUser), 300);
+        }
+      }
+    }).catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, allUsers, onLogin, onSignUp]);
 
   // Unified Google Sign-In with Firebase Auth & auto-detection of existing users
   const handleGoogleSignInUnified = async () => {
@@ -255,6 +331,129 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
       setErrorMessage(err?.message || "Failed to complete Google Sign-In. Please use PIN login.");
     } finally {
       setIsGoogleAuthLoading(false);
+    }
+  };
+
+  // Launch Chrome External Web Authentication
+  const handleLaunchChromeLogin = async () => {
+    setIsLaunchingChrome(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    setManualAuthCode("");
+
+    try {
+      const userHint = selectedLoginUser?.email || email.trim() || undefined;
+      const session = await createWebAuthTicket(userHint);
+      if (!session) {
+        setErrorMessage("Could not initialize external web login ticket. Please try PIN.");
+        setIsLaunchingChrome(false);
+        return;
+      }
+
+      setActiveWebAuthSession(session);
+      openInExternalChromeBrowser(session.webLoginUrl);
+    } catch (err: any) {
+      console.error("Chrome Web Auth launch error:", err);
+      setErrorMessage("Could not launch Google Chrome browser. Please log in using PIN or Google.");
+    } finally {
+      setIsLaunchingChrome(false);
+    }
+  };
+
+  // Poll for external Chrome authentication status
+  useEffect(() => {
+    if (!activeWebAuthSession || !isOpen) return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const result = await checkWebAuthStatus(activeWebAuthSession.ticket);
+        if (!isMounted) return;
+
+        if (result.status === "authenticated" && result.user) {
+          clearInterval(interval);
+          setActiveWebAuthSession(null);
+
+          const matchedUser: UserAccount = {
+            id: result.user.id || "user-" + result.user.email.replace(/[^a-zA-Z0-9]/g, "_"),
+            name: result.user.name || "Khata User",
+            email: result.user.email || "",
+            phone: result.user.phone || phone || "+919935612249",
+            accountType: (result.user.accountType as any) || "Personal",
+            avatarColor: result.user.avatarColor || "#1A73E8",
+            joinedDate: "Today",
+            lastLogin: "Active Now",
+            authProvider: "google",
+            pin: "1234",
+            password: "khata",
+          };
+
+          upsertUserAccount(matchedUser);
+          syncUserProfileToFirestore(matchedUser).catch(() => {});
+
+          setSuccessMessage(`Chrome Verified! Welcome back, ${matchedUser.name}! Restoring ledger...`);
+          setOnboardingCompleted(true);
+          setStoredAuthState(true);
+
+          setTimeout(() => {
+            onLogin(matchedUser);
+          }, 600);
+        }
+      } catch (e) {
+        console.warn("Chrome web auth poll error:", e);
+      }
+    }, 1600);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [activeWebAuthSession, isOpen, phone, onLogin]);
+
+  // Handle manual 6-digit confirmation code verification
+  const handleVerifyManualCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualAuthCode.trim() || manualAuthCode.trim().length !== 6) {
+      setErrorMessage("Please enter the 6-digit confirmation code shown in Chrome.");
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    setErrorMessage("");
+    try {
+      const result = await verifyWebAuthCode(manualAuthCode.trim());
+      if (result.success && result.user) {
+        setActiveWebAuthSession(null);
+        const authedUser: UserAccount = {
+          id: result.user.id || "user-" + result.user.email.replace(/[^a-zA-Z0-9]/g, "_"),
+          name: result.user.name || "Khata User",
+          email: result.user.email || "",
+          phone: result.user.phone || phone || "+919935612249",
+          accountType: (result.user.accountType as any) || "Personal",
+          avatarColor: result.user.avatarColor || "#1A73E8",
+          joinedDate: "Today",
+          lastLogin: "Active Now",
+          authProvider: "google",
+          pin: "1234",
+          password: "khata",
+        };
+
+        upsertUserAccount(authedUser);
+        syncUserProfileToFirestore(authedUser).catch(() => {});
+
+        setSuccessMessage(`Code Verified! Welcome back, ${authedUser.name}!`);
+        setOnboardingCompleted(true);
+        setStoredAuthState(true);
+        setTimeout(() => {
+          onLogin(authedUser);
+        }, 500);
+      } else {
+        setErrorMessage(result.error || "Invalid or expired confirmation code. Please check Chrome.");
+      }
+    } catch (err: any) {
+      setErrorMessage("Verification error. Please try again or use PIN.");
+    } finally {
+      setIsVerifyingCode(false);
     }
   };
 
@@ -477,14 +676,14 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
         {/* ========================================================================= */}
         {mode === "login" && (
           <div className="space-y-4 py-3">
-            {/* Unified 1-Click Google Sign In */}
-            <div>
+            {/* Unified 1-Click Google Sign In & Chrome External Browser Login */}
+            <div className="space-y-2">
               <button
                 id="btn-google-unified-login"
                 type="button"
-                disabled={isGoogleAuthLoading}
+                disabled={isGoogleAuthLoading || isLaunchingChrome}
                 onClick={handleGoogleSignInUnified}
-                className="w-full py-3 px-4 bg-white hover:bg-[#F8F9FA] active:bg-[#F1F3F4] text-[#202124] font-semibold text-xs sm:text-sm rounded-2xl border border-[#DADCE0] shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+                className="w-full py-2.5 px-4 bg-white hover:bg-[#F8F9FA] active:bg-[#F1F3F4] text-[#202124] font-semibold text-xs sm:text-sm rounded-2xl border border-[#DADCE0] shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer"
               >
                 {isGoogleAuthLoading ? (
                   <RefreshCw size={16} className="animate-spin text-[#1A73E8]" />
@@ -511,10 +710,92 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                 <span>
                   {isGoogleAuthLoading
                     ? "Authenticating with Google..."
-                    : "Continue with Google (Auto-Detect Account)"}
+                    : "Continue with Google (Auto-Detect)"}
                 </span>
               </button>
+
+              {/* Log In via External Chrome Browser */}
+              <button
+                id="btn-login-via-chrome"
+                type="button"
+                disabled={isLaunchingChrome || isGoogleAuthLoading}
+                onClick={handleLaunchChromeLogin}
+                className="w-full py-2.5 px-4 bg-[#F8F9FA] hover:bg-[#E8F0FE] text-[#1A73E8] font-bold text-xs rounded-2xl border border-[#DADCE0] hover:border-[#1A73E8] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+              >
+                {isLaunchingChrome ? (
+                  <RefreshCw size={14} className="animate-spin text-[#1A73E8]" />
+                ) : (
+                  <Compass size={15} className="text-[#1A73E8]" />
+                )}
+                <span>Log In via Chrome / Web Browser</span>
+                <ExternalLink size={12} className="text-[#5F6368]" />
+              </button>
             </div>
+
+            {/* Active Chrome Web Authentication Waiting Box */}
+            {activeWebAuthSession && (
+              <div className="p-3.5 bg-[#E8F0FE]/80 rounded-2xl border border-[#D2E3FC] space-y-3 animate-fadeIn">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-white text-[#1A73E8] flex items-center justify-center shadow-xs">
+                      <RefreshCw size={16} className="animate-spin text-[#1A73E8]" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[#1A73E8]">Waiting for Chrome Authentication...</h4>
+                      <p className="text-[11px] text-[#5F6368]">
+                        Complete sign in inside the external Chrome browser tab.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveWebAuthSession(null)}
+                    className="text-[10px] text-[#5F6368] hover:text-[#C5221F] font-bold px-2 py-1 rounded-lg bg-white border border-[#DADCE0] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                {/* 6-Digit Verification Code Manual Input */}
+                <form onSubmit={handleVerifyManualCode} className="space-y-2 pt-1 border-t border-[#D2E3FC]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-[#3C4043]">
+                      Or enter 6-digit confirmation code from Chrome:
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      inputMode="numeric"
+                      value={manualAuthCode}
+                      onChange={(e) => setManualAuthCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="e.g. 849201"
+                      className="flex-1 px-3 py-1.5 text-center text-sm font-mono font-bold bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none tracking-wider"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isVerifyingCode || manualAuthCode.length !== 6}
+                      className="px-3 py-1.5 bg-[#1A73E8] hover:bg-[#1557B0] disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                    >
+                      {isVerifyingCode ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                      <span>Verify</span>
+                    </button>
+                  </div>
+                </form>
+
+                <div className="flex items-center justify-between text-[11px] pt-1">
+                  <button
+                    type="button"
+                    onClick={() => openInExternalChromeBrowser(activeWebAuthSession.webLoginUrl)}
+                    className="text-[#1A73E8] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <ExternalLink size={11} />
+                    <span>Reopen in Google Chrome</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Login Mode Tabs (PIN vs Password vs Fast Unlock) */}
             <div className="grid grid-cols-3 gap-1 p-1 bg-[#F1F3F4] rounded-2xl">

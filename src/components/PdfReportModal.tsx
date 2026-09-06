@@ -22,6 +22,7 @@ import { CategoryIcon } from "./CategoryIcon";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import confetti from "canvas-confetti";
+import { deliverExportFile } from "../utils/export";
 
 interface PdfReportModalProps {
   isOpen: boolean;
@@ -123,7 +124,10 @@ export const PdfReportModal: React.FC<PdfReportModalProps> = ({
       }
 
       const cleanMonth = monthName.replace(/\s+/g, "_");
-      pdf.save(`Khata_Financial_Summary_${cleanMonth}.pdf`);
+      const pdfFilename = `Khata_Financial_Summary_${cleanMonth}.pdf`;
+      const pdfBlob = pdf.output("blob");
+
+      await deliverExportFile(pdfBlob, pdfFilename, "application/pdf", "Khata Monthly Report");
 
       try {
         confetti({
