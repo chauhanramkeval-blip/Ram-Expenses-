@@ -61,7 +61,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Khata-Expense-Advisor-APK
+          name: Ramkeval-chauhan-Expences-APK
           path: android/app/build/outputs/apk/debug/*.apk
 
 
