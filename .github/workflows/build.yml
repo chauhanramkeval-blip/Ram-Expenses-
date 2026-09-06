@@ -24,15 +24,11 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-
-      - name: Install Dependencies and Build Web App
-        run: |
-          npm install
-          npm run build
-
-      - name: Setup Capacitor and Android
+          
+      - name: Setup Capacitor and Android Platform
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
+          npm run build
           if [ ! -d "android" ]; then
             npx cap add android
           fi
@@ -41,13 +37,12 @@ jobs:
       - name: Fix Duplicate Kotlin Classes
         run: |
           cat << 'EOF' >> android/app/build.gradle
-
           configurations.all {
               resolutionStrategy {
                   eachDependency { DependencyResolveDetails details ->
                       if (details.requested.group == 'org.jetbrains.kotlin') {
                           if (details.requested.name == 'kotlin-stdlib-jdk7' || details.requested.name == 'kotlin-stdlib-jdk8') {
-                              details.useTarget("org.jetbrains.kotlin:kotlin-stdlib:${details.requested.version}")
+                              details.useTarget("org.jetbrains.kotlin:kotlin-stdlib")
                           }
                       }
                   }
@@ -66,3 +61,4 @@ jobs:
         with:
           name: Khata-Expense-Advisor-APK
           path: android/app/build/outputs/apk/debug/*.apk
+
