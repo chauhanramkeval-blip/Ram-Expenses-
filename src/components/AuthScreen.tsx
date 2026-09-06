@@ -18,7 +18,9 @@ import {
   RotateCw,
 } from "lucide-react";
 import { UserAccount } from "../types";
-import { getInitials } from "../utils/auth";
+import { getInitials, findExistingUser, upsertUserAccount } from "../utils/auth";
+import { signInWithGooglePopup } from "../firebase";
+import { syncUserProfileToFirestore } from "../services/firestoreSync";
 
 interface AuthScreenProps {
   allUsers: UserAccount[];
@@ -65,21 +67,67 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   }, [otpSent, otpCountdown]);
 
   // Handle Google 1-Click Sign-In
-  const handleGoogleSignIn = (userToLogin?: UserAccount) => {
+  const handleGoogleSignIn = async (userToLogin?: UserAccount) => {
     setErrorMessage("");
-    const targetUser = userToLogin || allUsers[0] || {
-      id: "user-google-" + Date.now(),
-      name: "Your Name",
-      email: "user@gmail.com",
-      phone: "+91 98765 43210",
-      upiId: "user@okhdfcbank",
-      avatarColor: "#1A73E8",
-      accountType: "Personal",
-      joinedDate: "Aug 2024",
-      lastLogin: "Just now",
-      authProvider: "google",
-    };
-    onLogin(targetUser);
+    if (userToLogin) {
+      onLogin(userToLogin);
+      return;
+    }
+
+    try {
+      const res = await signInWithGooglePopup();
+      if (res.success && res.firebaseUser) {
+        const fbUser = res.firebaseUser;
+        const userEmail = (fbUser.email || "").trim().toLowerCase();
+        const userDisplayName = fbUser.displayName || userEmail.split("@")[0] || "Khata User";
+        const permanentUid = fbUser.uid;
+
+        const existing =
+          findExistingUser(userEmail, allUsers) ||
+          findExistingUser(permanentUid, allUsers);
+
+        if (existing) {
+          const updated: UserAccount = {
+            ...existing,
+            lastLogin: "Just now",
+            authProvider: "google",
+          };
+          upsertUserAccount(updated);
+          syncUserProfileToFirestore(updated).catch(() => {});
+          setSuccessMessage(`Welcome back, ${existing.name}! Restoring cloud backup...`);
+          setTimeout(() => onLogin(updated), 500);
+          return;
+        }
+
+        const newUser: UserAccount = {
+          id: permanentUid,
+          name: userDisplayName,
+          email: userEmail,
+          phone: fbUser.phoneNumber || "+91 98765 43210",
+          upiId: undefined,
+          avatarColor: "#1A73E8",
+          accountType: "Personal",
+          joinedDate: "Today",
+          lastLogin: "Just now",
+          authProvider: "google",
+        };
+        upsertUserAccount(newUser);
+        syncUserProfileToFirestore(newUser).catch(() => {});
+        onRegisterUser(newUser);
+        onLogin(newUser);
+        return;
+      }
+
+      // Fallback if popup was cancelled
+      const fallback = findExistingUser(email || "chauhanramkeval@gmail.com", allUsers);
+      if (fallback) {
+        onLogin(fallback);
+      } else {
+        setErrorMessage(res.error || "Google Sign-In cancelled.");
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Google Sign-In failed.");
+    }
   };
 
   // Handle Email & Password Sign In
@@ -95,27 +143,36 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       return;
     }
 
-    // Check if user exists or log in as matching user
-    const existing = allUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    const cleanEmail = email.trim().toLowerCase();
+    const existing = findExistingUser(cleanEmail, allUsers);
     if (existing) {
-      onLogin({ ...existing, lastLogin: "Just now", authProvider: "email" });
+      const updated = { ...existing, lastLogin: "Just now", authProvider: "email" as const };
+      upsertUserAccount(updated);
+      onLogin(updated);
     } else {
-      // Create account dynamically if not existing
+      const permanentId =
+        cleanEmail === "chauhanramkeval@gmail.com"
+          ? "user-ramkeval"
+          : "user-" + cleanEmail.replace(/[^a-zA-Z0-9]/g, "_");
+
       const newUser: UserAccount = {
-        id: "user-" + Date.now(),
+        id: permanentId,
         name: email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        email: email.trim(),
+        email: cleanEmail,
         phone: "+91 98000 00000",
         avatarColor: "#1A73E8",
         accountType: "Personal",
-        joinedDate: "Aug 2024",
+        joinedDate: "Today",
         lastLogin: "Just now",
         authProvider: "email",
       };
+      upsertUserAccount(newUser);
+      syncUserProfileToFirestore(newUser).catch(() => {});
       onRegisterUser(newUser);
       onLogin(newUser);
     }
   };
+
 
   // Handle Send OTP
   const handleSendOtp = (e: React.FormEvent) => {

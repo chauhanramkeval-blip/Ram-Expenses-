@@ -191,3 +191,72 @@ export function verifyUserPassword(user?: UserAccount | null, enteredPassword?: 
   );
 }
 
+
+export function findExistingUser(
+  identifier: string,
+  userList?: UserAccount[]
+): UserAccount | null {
+  if (!identifier || typeof identifier !== "string") return null;
+  const clean = identifier.trim().toLowerCase();
+  const list = userList && userList.length > 0 ? userList : getStoredUsers();
+
+  // 1. Match by exact ID
+  const byId = list.find((u) => u.id.toLowerCase() === clean);
+  if (byId) return byId;
+
+  // 2. Match by email
+  const byEmail = list.find((u) => u.email && u.email.toLowerCase() === clean);
+  if (byEmail) return byEmail;
+
+  // 3. Match by phone digits (last 10 digits)
+  const phoneDigits = clean.replace(/\D/g, "");
+  if (phoneDigits.length >= 10) {
+    const last10 = phoneDigits.slice(-10);
+    const byPhone = list.find((u) => {
+      const uPhoneDigits = (u.phone || "").replace(/\D/g, "");
+      return uPhoneDigits.endsWith(last10);
+    });
+    if (byPhone) return byPhone;
+  }
+
+  // 4. Special match for primary user
+  if (clean === "chauhanramkeval@gmail.com" || clean === "user-ramkeval") {
+    const ramkeval = list.find((u) => u.id === "user-ramkeval" || u.email.toLowerCase() === "chauhanramkeval@gmail.com");
+    if (ramkeval) return ramkeval;
+  }
+
+  return null;
+}
+
+export function upsertUserAccount(user: UserAccount): { users: UserAccount[]; isNew: boolean } {
+  const currentUsers = getStoredUsers();
+  const existingIndex = currentUsers.findIndex(
+    (u) =>
+      u.id === user.id ||
+      (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase())
+  );
+
+  let updatedUsers: UserAccount[];
+  let isNew = false;
+
+  if (existingIndex >= 0) {
+    // Merge existing user profile with updated values
+    const existing = currentUsers[existingIndex];
+    const merged: UserAccount = {
+      ...existing,
+      ...user,
+      id: existing.id, // Preserve existing primary ID so data isn't orphaned
+      lastLogin: "Active Now",
+    };
+    updatedUsers = [...currentUsers];
+    updatedUsers[existingIndex] = merged;
+  } else {
+    isNew = true;
+    updatedUsers = [user, ...currentUsers];
+  }
+
+  saveStoredUsers(updatedUsers);
+  return { users: updatedUsers, isNew };
+}
+
+

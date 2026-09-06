@@ -16,9 +16,11 @@ import {
   Repeat,
   ArrowRight,
   FileSpreadsheet,
+  FileText,
   Download,
   Check,
   Sparkles,
+  UploadCloud,
 } from "lucide-react";
 import {
   Expense,
@@ -53,6 +55,7 @@ export interface TransactionsViewProps {
   customIncomeCategories?: IncomeCategoryMeta[];
   onOpenCategoryManager?: (tab: "expense" | "income") => void;
   onOpenExportModal?: () => void;
+  onOpenBankStatementModal?: () => void;
 }
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({
@@ -74,6 +77,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   customIncomeCategories,
   onOpenCategoryManager,
   onOpenExportModal,
+  onOpenBankStatementModal,
 }) => {
   // Segmented tab state: "expenses" (Red) vs "income" (Green)
   const [activeSegment, setActiveSegment] = useState<"expenses" | "income">(initialSegment);
@@ -592,6 +596,25 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             )}
           </div>
 
+          {/* Smart Upload Statement Button (Gemini AI) */}
+          {onOpenBankStatementModal && (
+            <button
+              type="button"
+              id="btn-upload-statement-top"
+              onClick={onOpenBankStatementModal}
+              title="Upload & Auto-Parse Bank Statement (PDF, CSV, Images) with Gemini AI"
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#E8F0FE] hover:bg-[#D2E3FC] text-[#1A73E8] border border-[#D2E3FC] rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
+            >
+              <UploadCloud size={15} className="text-[#1A73E8]" />
+              <span className="hidden sm:inline">Upload Statement</span>
+              <span className="sm:hidden">Statement</span>
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-[#1A73E8] text-white">
+                <Sparkles size={9} />
+                AI
+              </span>
+            </button>
+          )}
+
           {/* Export to Excel Button */}
           <button
             type="button"
@@ -601,9 +624,23 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             className="flex items-center gap-1.5 px-3 py-2 bg-[#E6F4EA] hover:bg-[#CEEAD6] text-[#137333] border border-[#CEEAD6] rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
           >
             <FileSpreadsheet size={15} className="text-[#137333]" />
-            <span className="hidden sm:inline">Export to Excel</span>
+            <span className="hidden sm:inline">Export Excel</span>
             <span className="sm:hidden">Excel</span>
           </button>
+
+          {/* Export CSV / Other formats button */}
+          {onOpenExportModal && (
+            <button
+              type="button"
+              id="btn-export-csv-top"
+              onClick={onOpenExportModal}
+              title="Export ledger as CSV or JSON"
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#F8F9FA] hover:bg-[#F1F3F4] text-[#3C4043] border border-[#DADCE0] rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
+            >
+              <FileText size={15} className="text-[#5F6368]" />
+              <span className="hidden md:inline">CSV</span>
+            </button>
+          )}
 
           {/* Primary Quick Action Button */}
           {activeSegment === "expenses" ? (

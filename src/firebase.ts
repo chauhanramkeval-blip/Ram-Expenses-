@@ -1,5 +1,14 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { getFirestore, Firestore, doc, getDocFromServer } from "firebase/firestore";
+import {
+  getAuth,
+  Auth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut as fbSignOut,
+  onAuthStateChanged,
+  User as FirebaseUser,
+} from "firebase/auth";
 import appletConfig from "../firebase-applet-config.json";
 
 export interface FirebaseConfig {
@@ -10,6 +19,7 @@ export interface FirebaseConfig {
   messagingSenderId: string;
   appId: string;
   firestoreDatabaseId?: string;
+  oAuthClientId?: string;
 }
 
 const LOCAL_STORAGE_CUSTOM_FIREBASE_KEY = "khata_custom_firebase_config_v1";
@@ -23,6 +33,7 @@ export const DEFAULT_FIREBASE_CONFIG: FirebaseConfig = {
   messagingSenderId: appletConfig?.messagingSenderId || "123456789012",
   appId: appletConfig?.appId || "1:123456789012:web:abcdef123456",
   firestoreDatabaseId: appletConfig?.firestoreDatabaseId || "",
+  oAuthClientId: appletConfig?.oAuthClientId || "",
 };
 
 /**
@@ -82,14 +93,16 @@ export const resetCustomFirebaseConfig = () => {
 
 let cachedApp: FirebaseApp | null = null;
 let cachedDb: Firestore | null = null;
+let cachedAuth: Auth | null = null;
 let lastInitConfigKey: string = "";
 
 /**
- * Safely initializes and returns Firebase App and Firestore instances without crashing
+ * Safely initializes and returns Firebase App, Firestore and Auth instances without crashing
  */
 export const getFirebaseInstances = (): {
   app: FirebaseApp | null;
   db: Firestore | null;
+  auth: Auth | null;
   isValid: boolean;
   error: string | null;
 } => {
@@ -100,13 +113,14 @@ export const getFirebaseInstances = (): {
     return {
       app: null,
       db: null,
+      auth: null,
       isValid: false,
       error: "Firebase credentials are not configured or contain placeholder values.",
     };
   }
 
-  if (cachedApp && cachedDb && lastInitConfigKey === configKey) {
-    return { app: cachedApp, db: cachedDb, isValid: true, error: null };
+  if (cachedApp && cachedDb && cachedAuth && lastInitConfigKey === configKey) {
+    return { app: cachedApp, db: cachedDb, auth: cachedAuth, isValid: true, error: null };
   }
 
   try {
@@ -133,16 +147,20 @@ export const getFirebaseInstances = (): {
       db = getFirestore(app);
     }
 
+    const auth = getAuth(app);
+
     cachedApp = app;
     cachedDb = db;
+    cachedAuth = auth;
     lastInitConfigKey = configKey;
 
-    return { app, db, isValid: true, error: null };
+    return { app, db, auth, isValid: true, error: null };
   } catch (err: any) {
     console.error("Firebase initialization failed safely:", err);
     return {
       app: null,
       db: null,
+      auth: null,
       isValid: false,
       error: err?.message || "Failed to initialize Firebase connection.",
     };
@@ -153,3 +171,78 @@ export const getFirestoreDb = (): Firestore | null => {
   const { db } = getFirebaseInstances();
   return db;
 };
+
+export const getFirebaseAuth = (): Auth | null => {
+  const { auth } = getFirebaseInstances();
+  return auth;
+};
+
+/**
+ * Sign in using Firebase Google Auth with popup
+ */
+export const signInWithGooglePopup = async (): Promise<{
+  success: boolean;
+  firebaseUser?: FirebaseUser;
+  error?: string;
+}> => {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    return { success: false, error: "Firebase Authentication is not ready." };
+  }
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    const result = await signInWithPopup(auth, provider);
+    return { success: true, firebaseUser: result.user };
+  } catch (err: any) {
+    console.warn("Google Sign-In Popup prompt:", err);
+    return {
+      success: false,
+      error: err?.message || "Google sign-in popup was cancelled or failed.",
+    };
+  }
+};
+
+/**
+ * Sign out of Firebase Auth
+ */
+export const signOutFirebase = async (): Promise<boolean> => {
+  const auth = getFirebaseAuth();
+  if (!auth) return true;
+  try {
+    await fbSignOut(auth);
+    return true;
+  } catch (err) {
+    console.error("Firebase signOut error", err);
+    return false;
+  }
+};
+
+/**
+ * Subscribe to persistent Firebase Auth state changes
+ */
+export const subscribeToFirebaseAuthState = (
+  callback: (user: FirebaseUser | null) => void
+): (() => void) => {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    return () => {};
+  }
+  return onAuthStateChanged(auth, callback);
+};
+
+/**
+ * Test server connection to Firestore
+ */
+export async function testFirestoreConnection() {
+  const db = getFirestoreDb();
+  if (!db) return;
+  try {
+    await getDocFromServer(doc(db, "test", "connection"));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("the client is offline")) {
+      console.warn("Firestore connection check: Client offline.");
+    }
+  }
+}
+

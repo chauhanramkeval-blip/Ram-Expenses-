@@ -3,13 +3,14 @@ import {
   doc,
   setDoc,
   deleteDoc,
+  getDoc,
   getDocs,
   onSnapshot,
   writeBatch,
   Unsubscribe,
 } from "firebase/firestore";
 import { getFirestoreDb, isFirebaseConfigValid } from "../firebase";
-import { Expense, Income, UserBudget } from "../types";
+import { Expense, Income, UserBudget, UserAccount } from "../types";
 
 export type SyncStatus = "synced" | "syncing" | "offline" | "error" | "unconfigured";
 
@@ -23,7 +24,27 @@ export interface SyncState {
   errorMessage: string | null;
 }
 
+export type OperationType = "create" | "read" | "update" | "delete" | "list" | "batch" | "subscribe";
+
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null
+) {
+  const err = error as { code?: string; message?: string };
+  const errorInfo = {
+    operationType,
+    path,
+    code: err?.code,
+    message: err?.message,
+    timestamp: new Date().toISOString(),
+  };
+  console.error("Firestore operation error:", JSON.stringify(errorInfo, null, 2));
+  return errorInfo;
+}
+
 const getSyncKey = (userId?: string) => `khata_firestore_last_sync_${userId || "default"}`;
+
 
 export const getStoredLastSyncTime = (userId?: string): string | null => {
   try {
@@ -550,7 +571,139 @@ export const deleteUserFirestoreData = async (userId: string): Promise<boolean> 
     await batch.commit();
     return true;
   } catch (err) {
-    console.error(`Failed to delete Firestore data for user ${userId}:`, err);
+    handleFirestoreError(err, "delete", `users/${userId}`);
     return false;
   }
 };
+
+/**
+ * Saves user profile metadata to Firestore under users/{userId}/profile/info
+ */
+export const syncUserProfileToFirestore = async (user: UserAccount): Promise<boolean> => {
+  const db = getFirestoreDb();
+  if (!db || !isFirebaseConfigValid() || !user?.id) {
+    return false;
+  }
+  try {
+    const profileRef = doc(db, "users", user.id, "profile", "info");
+    const cleanProfile = sanitizeForFirestore({
+      id: user.id,
+      name: user.name || "User",
+      email: user.email || "",
+      phone: user.phone || "",
+      upiId: user.upiId || "",
+      accountType: user.accountType || "Personal",
+      avatarColor: user.avatarColor || "#1A73E8",
+      joinedDate: user.joinedDate || "Today",
+      lastLogin: new Date().toISOString(),
+      authProvider: user.authProvider || "google",
+      updatedAt: new Date().toISOString(),
+    });
+    await setDoc(profileRef, cleanProfile, { merge: true });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, "update", `users/${user.id}/profile/info`);
+    return false;
+  }
+};
+
+/**
+ * Fetches user profile metadata from Firestore
+ */
+export const fetchUserProfileFromFirestore = async (
+  userId: string
+): Promise<UserAccount | null> => {
+  const db = getFirestoreDb();
+  if (!db || !isFirebaseConfigValid() || !userId) {
+    return null;
+  }
+  try {
+    const profileRef = doc(db, "users", userId, "profile", "info");
+    const snap = await getDoc(profileRef);
+    if (snap.exists()) {
+      return snap.data() as UserAccount;
+    }
+  } catch (err) {
+    handleFirestoreError(err, "read", `users/${userId}/profile/info`);
+  }
+  return null;
+};
+
+/**
+ * Comprehensive Cloud Data Restore for user:
+ * Fetches all expenses, incomes, and budget settings from Firestore for the user's permanent UID.
+ */
+export const restoreCloudDataForUser = async (
+  userId: string
+): Promise<{
+  success: boolean;
+  expenses: Expense[];
+  incomes: Income[];
+  budget: UserBudget | null;
+  totalRecords: number;
+  error?: string;
+}> => {
+  const db = getFirestoreDb();
+  if (!db || !isFirebaseConfigValid() || !userId) {
+    return {
+      success: false,
+      expenses: [],
+      incomes: [],
+      budget: null,
+      totalRecords: 0,
+      error: "Firebase not connected or user ID missing",
+    };
+  }
+
+  try {
+    // 1. Fetch expenses
+    const expSnap = await getDocs(collection(db, "users", userId, "expenses"));
+    const expenses: Expense[] = [];
+    expSnap.forEach((d) => {
+      const data = d.data() as Expense;
+      expenses.push({ ...data, id: d.id || data.id, userId });
+    });
+    expenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // 2. Fetch incomes
+    const incSnap = await getDocs(collection(db, "users", userId, "incomes"));
+    const incomes: Income[] = [];
+    incSnap.forEach((d) => {
+      const data = d.data() as Income;
+      incomes.push({ ...data, id: d.id || data.id, userId });
+    });
+    incomes.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // 3. Fetch budget
+    let budget: UserBudget | null = null;
+    try {
+      const budgetSnap = await getDoc(doc(db, "users", userId, "settings", "budget"));
+      if (budgetSnap.exists()) {
+        budget = budgetSnap.data() as UserBudget;
+      }
+    } catch (e) {
+      console.warn("Could not fetch remote budget settings", e);
+    }
+
+    setStoredLastSyncTime(new Date().toISOString(), userId);
+
+    return {
+      success: true,
+      expenses,
+      incomes,
+      budget,
+      totalRecords: expenses.length + incomes.length,
+    };
+  } catch (err: any) {
+    handleFirestoreError(err, "list", `users/${userId}`);
+    return {
+      success: false,
+      expenses: [],
+      incomes: [],
+      budget: null,
+      totalRecords: 0,
+      error: err?.message || "Failed to restore cloud data.",
+    };
+  }
+};
+

@@ -23,6 +23,7 @@ import { BackupModal } from "./components/BackupModal";
 import { FirebaseSyncModal } from "./components/FirebaseSyncModal";
 import { PdfReportModal } from "./components/PdfReportModal";
 import { InstallAppModal } from "./components/InstallAppModal";
+import { BankStatementModal } from "./components/BankStatementModal";
 import { ReceiptScannerModal } from "./components/ReceiptScannerModal";
 import { VoiceLoggerModal } from "./components/VoiceLoggerModal";
 import { SmsBankReaderModal } from "./components/SmsBankReaderModal";
@@ -44,7 +45,13 @@ import {
   subscribeToExpensesCollection,
   subscribeToIncomesCollection,
   deleteUserFirestoreData,
+  restoreCloudDataForUser,
+  syncUserProfileToFirestore,
 } from "./services/firestoreSync";
+import {
+  subscribeToFirebaseAuthState,
+  signOutFirebase,
+} from "./firebase";
 import {
   CategoryMeta,
   Expense,
@@ -63,7 +70,10 @@ import {
   setStoredAuthState,
   isOnboardingCompleted,
   setOnboardingCompleted,
+  findExistingUser,
+  upsertUserAccount,
 } from "./utils/auth";
+
 import {
   loadUserExpenses,
   saveUserExpenses,
@@ -155,6 +165,7 @@ export default function App() {
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isBankStatementModalOpen, setIsBankStatementModalOpen] = useState(false);
   const [isFirebaseSyncModalOpen, setIsFirebaseSyncModalOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [isFirebaseSynced, setIsFirebaseSynced] = useState<boolean>(true);
@@ -265,6 +276,42 @@ export default function App() {
     };
   }, [currentUser.id]);
 
+  // Persistent Firebase Auth State Listener across app reloads/restarts
+  useEffect(() => {
+    const unsubAuth = subscribeToFirebaseAuthState((fbUser) => {
+      if (fbUser) {
+        const email = (fbUser.email || "").trim().toLowerCase();
+        const permanentUid = fbUser.uid;
+
+        // Auto-detect existing user account
+        const existing =
+          findExistingUser(email, users) ||
+          findExistingUser(permanentUid, users);
+
+        if (existing) {
+          setCurrentUser(existing);
+          setIsLoggedIn(true);
+
+          // Restore cloud data for existing user
+          restoreCloudDataForUser(existing.id).then((cloudRes) => {
+            if (cloudRes.success && (cloudRes.expenses.length > 0 || cloudRes.incomes.length > 0)) {
+              setExpenses(cloudRes.expenses);
+              setIncomes(cloudRes.incomes);
+              if (cloudRes.budget) setBudget(cloudRes.budget);
+              saveUserExpenses(existing.id, cloudRes.expenses);
+              saveUserIncomes(existing.id, cloudRes.incomes);
+              setIsFirebaseSynced(true);
+            }
+          });
+        }
+      }
+    });
+
+    return () => {
+      if (unsubAuth) unsubAuth();
+    };
+  }, [users]);
+
   // Sync users and authentication state
   useEffect(() => {
     saveStoredUsers(users);
@@ -364,7 +411,7 @@ export default function App() {
 
   // Auth & Profile Handlers
   const handleSignUp = (newUser: UserAccount) => {
-    // 1. Initialize empty data slate (₹0 balance, 0 expenses) for the new user
+    // 1. Initialize data slate for the new user
     saveUserExpenses(newUser.id, []);
     saveUserIncomes(newUser.id, []);
     saveUserBudget(newUser.id, DEFAULT_BUDGET);
@@ -379,15 +426,9 @@ export default function App() {
     };
     saveUserSecurity(newUser.id, initialSecurity);
 
-    // 2. Set as primary user in stored users
-    setUsers((prev) => {
-      const filtered = prev.filter(
-        (u) => u.id !== newUser.id && u.email.toLowerCase() !== newUser.email.toLowerCase()
-      );
-      const updated = [newUser, ...filtered];
-      saveStoredUsers(updated);
-      return updated;
-    });
+    // 2. Set as primary user in stored users with deduplication
+    const { users: updatedUsers } = upsertUserAccount(newUser);
+    setUsers(updatedUsers);
 
     // 3. Set active user & fresh slate state
     setCurrentUser(newUser);
@@ -403,21 +444,26 @@ export default function App() {
     setEditingIncome(null);
     setSearchQuery("");
 
-    // 4. Persist state
+    // 4. Persist state & sync profile to Firestore
     setOnboardingCompleted(true);
     setStoredAuthState(true);
     setStoredCurrentUser(newUser);
+    syncUserProfileToFirestore(newUser).catch(() => {});
   };
 
-  const handleLogin = (user: UserAccount) => {
-    const userExpenses = loadUserExpenses(user.id);
-    const userIncomes = loadUserIncomes(user.id);
+  const handleLogin = async (user: UserAccount) => {
+    const { users: updatedUsers } = upsertUserAccount(user);
+    setUsers(updatedUsers);
+    setCurrentUser(user);
+
+    // 1. Load existing local cache first
+    let userExpenses = loadUserExpenses(user.id);
+    let userIncomes = loadUserIncomes(user.id);
     const userBudget = loadUserBudget(user.id, DEFAULT_BUDGET);
     const userExpCats = loadUserCategories(user.id, CATEGORY_LIST);
     const userIncCats = loadUserIncCategories(user.id, INCOME_CATEGORY_LIST);
     const userSecurity = loadUserSecurity(user.id, DEFAULT_SECURITY);
 
-    setCurrentUser(user);
     setExpenses(userExpenses);
     setIncomes(userIncomes);
     setBudget(userBudget);
@@ -433,6 +479,31 @@ export default function App() {
     setOnboardingCompleted(true);
     setStoredAuthState(true);
     setStoredCurrentUser(user);
+
+    // 2. Automatically restore cloud backup from Firestore for this user's UID
+    try {
+      const cloudRes = await restoreCloudDataForUser(user.id);
+      if (cloudRes.success) {
+        if (cloudRes.expenses.length > 0 || cloudRes.incomes.length > 0) {
+          // If local is empty or remote has records, restore remote records
+          if (userExpenses.length === 0 || cloudRes.expenses.length >= userExpenses.length) {
+            setExpenses(cloudRes.expenses);
+            saveUserExpenses(user.id, cloudRes.expenses);
+          }
+          if (userIncomes.length === 0 || cloudRes.incomes.length >= userIncomes.length) {
+            setIncomes(cloudRes.incomes);
+            saveUserIncomes(user.id, cloudRes.incomes);
+          }
+          if (cloudRes.budget) {
+            setBudget(cloudRes.budget);
+            saveUserBudget(user.id, cloudRes.budget);
+          }
+        }
+        setIsFirebaseSynced(true);
+      }
+    } catch (err) {
+      console.warn("Auto cloud restore on login:", err);
+    }
   };
 
   const handleLogout = () => {
@@ -446,7 +517,9 @@ export default function App() {
       saveUserSecurity(currentUser.id, securitySettings);
     }
 
-    // Immediately clear active user session
+    signOutFirebase().catch(() => {});
+
+    // Clear active user session
     setIsLoggedIn(false);
     setStoredAuthState(false);
     setIsLocked(false);
@@ -455,6 +528,7 @@ export default function App() {
     setIsAddAccountOpen(false);
     setPendingSwitchUser(null);
   };
+
 
   /**
    * Permanently deletes the active user's profile and all associated data,
@@ -1026,6 +1100,47 @@ export default function App() {
     saveUserIncCategories(currentUser.id, INCOME_CATEGORY_LIST);
   };
 
+  const handleBankStatementImport = async (imported: {
+    expenses: Expense[];
+    incomes: Income[];
+    count: number;
+    message: string;
+  }) => {
+    const activeUserId = currentUser.id;
+
+    if (imported.expenses.length > 0) {
+      setExpenses((prev) => {
+        const updated = [...imported.expenses, ...prev];
+        updated.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        saveUserExpenses(activeUserId, updated);
+        return updated;
+      });
+
+      for (const exp of imported.expenses) {
+        syncExpenseToFirestore(exp, activeUserId).catch((err) =>
+          console.warn("Firestore sync expense error:", err)
+        );
+      }
+    }
+
+    if (imported.incomes.length > 0) {
+      setIncomes((prev) => {
+        const updated = [...imported.incomes, ...prev];
+        updated.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        saveUserIncomes(activeUserId, updated);
+        return updated;
+      });
+
+      for (const inc of imported.incomes) {
+        syncIncomeToFirestore(inc, activeUserId).catch((err) =>
+          console.warn("Firestore sync income error:", err)
+        );
+      }
+    }
+
+    alert(imported.message);
+  };
+
   const handleTriggerInstall = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -1113,6 +1228,7 @@ export default function App() {
             customIncomeCategories={customIncomeCategories}
             onOpenCategoryManager={handleOpenCategoryManager}
             onOpenExportModal={() => setIsExportModalOpen(true)}
+            onOpenBankStatementModal={() => setIsBankStatementModalOpen(true)}
           />
         )}
 
@@ -1321,6 +1437,15 @@ export default function App() {
         filteredExpenses={expenses}
         currentUser={currentUser}
         onOpenBackupModal={() => setIsBackupModalOpen(true)}
+      />
+
+      <BankStatementModal
+        isOpen={isBankStatementModalOpen}
+        onClose={() => setIsBankStatementModalOpen(false)}
+        existingExpenses={expenses}
+        existingIncomes={incomes}
+        currentUser={currentUser}
+        onImportSuccess={handleBankStatementImport}
       />
 
       <BackupModal

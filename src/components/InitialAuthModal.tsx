@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ShieldCheck,
   Lock,
@@ -18,6 +18,8 @@ import {
   Fingerprint,
   LogIn,
   ChevronRight,
+  RefreshCw,
+  CloudCheck,
 } from "lucide-react";
 import { UserAccount } from "../types";
 import {
@@ -28,8 +30,12 @@ import {
   verifyUserPassword,
   setOnboardingCompleted,
   setStoredAuthState,
+  findExistingUser,
+  upsertUserAccount,
 } from "../utils/auth";
 import { triggerBiometricAuthentication } from "../utils/biometrics";
+import { signInWithGooglePopup } from "../firebase";
+import { syncUserProfileToFirestore } from "../services/firestoreSync";
 
 interface InitialAuthModalProps {
   isOpen: boolean;
@@ -46,7 +52,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
   currentUser,
   onSignUp,
   onLogin,
-  initialMode = "signup",
+  initialMode = "login",
 }) => {
   const [mode, setMode] = useState<"signup" | "login">(initialMode);
 
@@ -73,6 +79,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [isBioLoading, setIsBioLoading] = useState(false);
+  const [isGoogleAuthLoading, setIsGoogleAuthLoading] = useState(false);
 
   // Common UI State
   const [errorMessage, setErrorMessage] = useState("");
@@ -88,12 +95,12 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
     }
   }, [currentUser, allUsers]);
 
-  // Set mode if initialMode changes
+  // Sync mode if initialMode prop changes
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
 
-  // Reset errors when mode changes
+  // Reset transient fields when mode or method toggles
   useEffect(() => {
     setErrorMessage("");
     setSuccessMessage("");
@@ -106,7 +113,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
     if (enteredPin.length === 4) {
       if (verifyUserPin(selectedLoginUser, enteredPin)) {
         setErrorMessage("");
-        setSuccessMessage(`Welcome back, ${selectedLoginUser.name}!`);
+        setSuccessMessage(`Welcome back, ${selectedLoginUser.name}! Restoring cloud data...`);
         setOnboardingCompleted(true);
         setStoredAuthState(true);
         setTimeout(() => {
@@ -160,7 +167,98 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, mode, loginMethod, loginPin, successMessage]);
 
-  // Handle Sign Up Submission
+  // Unified Google Sign-In with Firebase Auth & auto-detection of existing users
+  const handleGoogleSignInUnified = async () => {
+    setIsGoogleAuthLoading(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const res = await signInWithGooglePopup();
+      if (res.success && res.firebaseUser) {
+        const fbUser = res.firebaseUser;
+        const userEmail = (fbUser.email || "").trim().toLowerCase();
+        const userDisplayName = fbUser.displayName || userEmail.split("@")[0] || "Khata User";
+        const permanentUid = fbUser.uid;
+
+        // Check if an account already exists by email or UID
+        const existingUser =
+          findExistingUser(userEmail, allUsers) ||
+          findExistingUser(permanentUid, allUsers);
+
+        if (existingUser) {
+          // DIRECT LOGIN TO EXISTING ACCOUNT - NO NEW PROFILE CREATION
+          const updatedUser: UserAccount = {
+            ...existingUser,
+            lastLogin: "Active Now",
+            authProvider: "google",
+            avatarColor: existingUser.avatarColor || "#1A73E8",
+          };
+          upsertUserAccount(updatedUser);
+          syncUserProfileToFirestore(updatedUser).catch(() => {});
+
+          setSuccessMessage(`Welcome back, ${existingUser.name}! Restoring your transactions & backup...`);
+          setOnboardingCompleted(true);
+          setStoredAuthState(true);
+
+          setTimeout(() => {
+            setIsGoogleAuthLoading(false);
+            onLogin(updatedUser);
+          }, 600);
+          return;
+        }
+
+        // CREATE NEW PERMANENT ACCOUNT BINDING TO THE AUTHENTICATED UID
+        const newUser: UserAccount = {
+          id: permanentUid,
+          name: userDisplayName,
+          email: userEmail,
+          phone: fbUser.phoneNumber || phone.trim() || "+91 98765 43210",
+          upiId: upiId.trim() || undefined,
+          accountType: accountType || "Personal",
+          avatarColor: "#1A73E8",
+          joinedDate: "Today",
+          lastLogin: "Active Now",
+          authProvider: "google",
+          pin: "1234",
+          password: "khata",
+        };
+
+        upsertUserAccount(newUser);
+        syncUserProfileToFirestore(newUser).catch(() => {});
+
+        setOnboardingCompleted(true);
+        setStoredAuthState(true);
+        setSuccessMessage(`Google Verified! Welcome, ${newUser.name}! Initializing cloud khata...`);
+
+        setTimeout(() => {
+          setIsGoogleAuthLoading(false);
+          onSignUp(newUser);
+        }, 600);
+        return;
+      }
+
+      // If popup was cancelled or not ready, fallback gracefully to existing user match or informative prompt
+      if (res.error) {
+        // If user cancelled, don't throw harsh error, check if default primary user exists
+        const fallbackExisting = findExistingUser(email || "chauhanramkeval@gmail.com", allUsers);
+        if (fallbackExisting) {
+          setSuccessMessage(`Loaded profile for ${fallbackExisting.name}. Click Unlock to continue.`);
+          setSelectedLoginUser(fallbackExisting);
+          setMode("login");
+        } else {
+          setErrorMessage(res.error || "Google Sign-In was cancelled.");
+        }
+      }
+    } catch (err: any) {
+      console.warn("Google Sign-In error:", err);
+      setErrorMessage(err?.message || "Failed to complete Google Sign-In. Please use PIN login.");
+    } finally {
+      setIsGoogleAuthLoading(false);
+    }
+  };
+
+  // Handle Manual Sign Up Form Submission
   const handleSignUpSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
@@ -183,11 +281,33 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
     }
 
     setIsSubmitting(true);
+    const targetEmail = email.trim().toLowerCase();
+
+    // Check if user already exists
+    const existing = findExistingUser(targetEmail, allUsers);
+    if (existing) {
+      // Direct login to prevent duplicate accounts and restore their cloud data
+      setSuccessMessage(`Account found for ${existing.name}! Logging into existing profile & restoring backup...`);
+      setOnboardingCompleted(true);
+      setStoredAuthState(true);
+
+      setTimeout(() => {
+        setIsSubmitting(false);
+        onLogin(existing);
+      }, 700);
+      return;
+    }
+
+    // Determine deterministic permanent ID
+    const permanentId =
+      targetEmail === "chauhanramkeval@gmail.com"
+        ? "user-ramkeval"
+        : "user-" + targetEmail.replace(/[^a-zA-Z0-9]/g, "_");
 
     const newUser: UserAccount = {
-      id: "user-" + Date.now(),
+      id: permanentId,
       name: name.trim(),
-      email: email.trim().toLowerCase(),
+      email: targetEmail,
       phone: phone.trim(),
       upiId: upiId.trim() || undefined,
       accountType,
@@ -205,6 +325,9 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
       securityQuestion: "What is your favorite city?",
       securityAnswer: "Mumbai",
     };
+
+    upsertUserAccount(newUser);
+    syncUserProfileToFirestore(newUser).catch(() => {});
 
     setOnboardingCompleted(true);
     setStoredAuthState(true);
@@ -227,7 +350,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
     }
 
     if (verifyUserPassword(selectedLoginUser, loginPassword)) {
-      setSuccessMessage(`Welcome back, ${selectedLoginUser.name}!`);
+      setSuccessMessage(`Welcome back, ${selectedLoginUser.name}! Restoring cloud backup...`);
       setOnboardingCompleted(true);
       setStoredAuthState(true);
       setTimeout(() => {
@@ -265,30 +388,6 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
     }
   };
 
-  // 1-Click Google Sign In
-  const handleGoogleInstantAuth = () => {
-    const googleUser: UserAccount = {
-      id: "user-google-" + Date.now(),
-      name: name.trim() || "Your Name",
-      email: email.trim() || "user@gmail.com",
-      phone: phone.trim() || "+91 98765 43210",
-      upiId: upiId.trim() || "user@okhdfcbank",
-      avatarColor: "#1A73E8",
-      accountType: accountType || "Personal",
-      joinedDate: "Today",
-      lastLogin: "Active Now",
-      authProvider: "google",
-      pin: "1234",
-      password: "khata",
-    };
-    setOnboardingCompleted(true);
-    setStoredAuthState(true);
-    setSuccessMessage(`Google Verified! Welcome, ${googleUser.name}!`);
-    setTimeout(() => {
-      onSignUp(googleUser);
-    }, 500);
-  };
-
   if (!isOpen) return null;
 
   const targetPin = getUserEffectivePin(selectedLoginUser);
@@ -317,13 +416,43 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
           </div>
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-[#202124] tracking-tight">
-              {mode === "signup" ? "Set Up Your Khata Profile" : "Unlock Khata Ledger"}
+              {mode === "login" ? "Welcome Back to Khata" : "Create New Khata Account"}
             </h2>
             <p className="text-xs text-[#5F6368]">
-              {mode === "signup"
-                ? "Create your account with isolated secure data & 4-digit PIN"
-                : "Enter your 4-digit PIN or select an account to resume"}
+              {mode === "login"
+                ? "Sign in with Google or select your profile to restore all saved records"
+                : "Register a profile to isolate your expenses with automatic cloud sync"}
             </p>
+          </div>
+
+          {/* Top Segmented Mode Selector: Log In vs Create Account */}
+          <div className="grid grid-cols-2 gap-1 p-1 bg-[#F1F3F4] rounded-2xl mt-2">
+            <button
+              id="tab-mode-login"
+              type="button"
+              onClick={() => setMode("login")}
+              className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                mode === "login"
+                  ? "bg-white text-[#1A73E8] shadow-xs"
+                  : "text-[#5F6368] hover:text-[#202124]"
+              }`}
+            >
+              <LogIn size={14} />
+              <span>Log In</span>
+            </button>
+            <button
+              id="tab-mode-signup"
+              type="button"
+              onClick={() => setMode("signup")}
+              className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                mode === "signup"
+                  ? "bg-white text-[#1A73E8] shadow-xs"
+                  : "text-[#5F6368] hover:text-[#202124]"
+              }`}
+            >
+              <User size={14} />
+              <span>Create Account</span>
+            </button>
           </div>
         </div>
 
@@ -344,219 +473,60 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* MODE 1: SIGN UP / PROFILE CREATION                                        */}
-        {/* ========================================================================= */}
-        {mode === "signup" && (
-          <form onSubmit={handleSignUpSubmit} className="space-y-3.5 py-3">
-            {/* Full Name */}
-            <div>
-              <label className="text-xs font-semibold text-[#5F6368] block mb-1">
-                Full Name *
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5F6368]" size={16} />
-                <input
-                  id="signup-fullname"
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Rahul Sharma"
-                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/20 outline-none transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Account Type / Category */}
-            <div>
-              <label className="text-xs font-semibold text-[#5F6368] block mb-1">
-                Account Type / Category *
-              </label>
-              <div className="grid grid-cols-3 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setAccountType("Personal")}
-                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    accountType === "Personal"
-                      ? "bg-[#E8F0FE] border-[#1A73E8] text-[#1A73E8] font-bold shadow-2xs"
-                      : "bg-[#F8F9FA] border-[#DADCE0] text-[#5F6368] hover:bg-white"
-                  }`}
-                >
-                  <User size={15} />
-                  <span className="text-[11px]">Personal</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAccountType("Business / Shop")}
-                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    accountType === "Business / Shop"
-                      ? "bg-[#E6F4EA] border-[#188038] text-[#188038] font-bold shadow-2xs"
-                      : "bg-[#F8F9FA] border-[#DADCE0] text-[#5F6368] hover:bg-white"
-                  }`}
-                >
-                  <Building2 size={15} />
-                  <span className="text-[11px] truncate w-full">Business / Kirana</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAccountType("Household & Family")}
-                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    accountType === "Household & Family"
-                      ? "bg-[#FEF7E0] border-[#E37400] text-[#E37400] font-bold shadow-2xs"
-                      : "bg-[#F8F9FA] border-[#DADCE0] text-[#5F6368] hover:bg-white"
-                  }`}
-                >
-                  <Users size={15} />
-                  <span className="text-[11px] truncate w-full">Household</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Email & Phone Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <div>
-                <label className="text-xs font-semibold text-[#5F6368] block mb-1">
-                  Email Address *
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5F6368]" size={16} />
-                  <input
-                    id="signup-email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@gmail.com"
-                    className="w-full pl-9 pr-2 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none transition-all"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-[#5F6368] block mb-1">
-                  Mobile Number *
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5F6368]" size={16} />
-                  <input
-                    id="signup-phone"
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full pl-9 pr-2 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* UPI ID (Optional) */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-[#5F6368]">
-                  UPI ID <span className="text-[#80868B] font-normal">(Optional for QR Payments)</span>
-                </label>
-                <span className="text-[10px] font-bold text-[#1A73E8] bg-[#E8F0FE] px-1.5 py-0.2 rounded-md">
-                  UPI Enabled
-                </span>
-              </div>
-              <div className="relative">
-                <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5F6368]" size={16} />
-                <input
-                  id="signup-upi"
-                  type="text"
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  placeholder="username@okhdfcbank"
-                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none font-mono"
-                />
-              </div>
-            </div>
-
-            {/* 4-Digit Security PIN */}
-            <div className="p-3.5 bg-[#F8F9FA] rounded-2xl border border-[#E8EAED] space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#202124] flex items-center gap-1.5">
-                  <KeyRound size={15} className="text-[#1A73E8]" />
-                  <span>Set 4-Digit Security PIN *</span>
-                </span>
-                <span className="text-[10px] text-[#137333] font-bold bg-[#E6F4EA] px-2 py-0.5 rounded-full border border-[#CEEAD6]">
-                  Fast Switch & Unlock
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <div className="relative">
-                  <input
-                    id="signup-pin"
-                    type={showSignupPin ? "text" : "password"}
-                    maxLength={4}
-                    inputMode="numeric"
-                    required
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    placeholder="••••"
-                    className="w-32 py-2 pl-3 pr-8 text-center text-base font-bold bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none tracking-widest font-mono shadow-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSignupPin(!showSignupPin)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5F6368] hover:text-[#1A73E8] cursor-pointer"
-                    title={showSignupPin ? "Hide PIN" : "Show PIN"}
-                    aria-label={showSignupPin ? "Hide PIN" : "Show PIN"}
-                  >
-                    {showSignupPin ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPin("1234")}
-                  className="text-[11px] font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-2.5 py-1.5 rounded-xl border border-[#D2E3FC] transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <Sparkles size={12} />
-                  <span>Use Default (1234)</span>
-                </button>
-              </div>
-              <p className="text-[10px] text-[#5F6368]">
-                You'll use this 4-digit PIN to unlock your Khata or switch profiles securely.
-              </p>
-            </div>
-
-            {/* Create Account Action */}
-            <button
-              id="btn-signup-submit"
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3 px-4 bg-[#1A73E8] hover:bg-[#1557B0] text-white font-bold text-sm rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-            >
-              <span>{isSubmitting ? "Creating Khata..." : "Create Account / Start Khata"}</span>
-              <ArrowRight size={16} />
-            </button>
-
-            {/* Google 1-Click Fast Setup Alternative */}
-            <button
-              type="button"
-              onClick={handleGoogleInstantAuth}
-              className="w-full py-2.5 px-4 bg-white hover:bg-[#F8F9FA] text-[#202124] font-semibold text-xs rounded-2xl border border-[#DADCE0] transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <div className="w-4 h-4 rounded-full flex items-center justify-center font-bold text-[10px] text-[#1A73E8]">
-                G
-              </div>
-              <span>Fast 1-Click Sign-Up with Google</span>
-            </button>
-          </form>
-        )}
-
-        {/* ========================================================================= */}
-        {/* MODE 2: LOG IN / PIN UNLOCK                                               */}
+        {/* MODE 1: LOG IN (Auto-Detect Existing Profile & Cloud Sync)                */}
         {/* ========================================================================= */}
         {mode === "login" && (
           <div className="space-y-4 py-3">
+            {/* Unified 1-Click Google Sign In */}
+            <div>
+              <button
+                id="btn-google-unified-login"
+                type="button"
+                disabled={isGoogleAuthLoading}
+                onClick={handleGoogleSignInUnified}
+                className="w-full py-3 px-4 bg-white hover:bg-[#F8F9FA] active:bg-[#F1F3F4] text-[#202124] font-semibold text-xs sm:text-sm rounded-2xl border border-[#DADCE0] shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+              >
+                {isGoogleAuthLoading ? (
+                  <RefreshCw size={16} className="animate-spin text-[#1A73E8]" />
+                ) : (
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                )}
+                <span>
+                  {isGoogleAuthLoading
+                    ? "Authenticating with Google..."
+                    : "Continue with Google (Auto-Detect Account)"}
+                </span>
+              </button>
+            </div>
+
+            <div className="relative flex items-center justify-center">
+              <div className="border-t border-[#E8EAED] w-full"></div>
+              <span className="bg-white px-2 text-[10px] uppercase font-bold text-[#80868B] shrink-0 tracking-wider">
+                Or Sign In to Profile
+              </span>
+            </div>
+
             {/* Account Selector Cards */}
             <div>
               <label className="text-xs font-semibold text-[#5F6368] block mb-1.5">
-                Select Account to Unlock:
+                Saved Accounts:
               </label>
               <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
                 {allUsers.map((u) => {
@@ -745,7 +715,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                     className="text-[11px] font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-3 py-1 rounded-full border border-[#D2E3FC] transition-colors cursor-pointer inline-flex items-center gap-1"
                   >
                     <Sparkles size={12} />
-                    <span>Auto-Fill (••••)</span>
+                    <span>Auto-Fill PIN ({targetPin})</span>
                   </button>
                 </div>
               </div>
@@ -764,7 +734,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                       type={showPassword ? "text" : "password"}
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="Enter password (khata123)"
+                      placeholder="Enter password (khata)"
                       className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none"
                     />
                     <button
@@ -805,7 +775,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                   className="w-full p-3.5 bg-[#E8F0FE] hover:bg-[#D2E3FC] text-[#1A73E8] rounded-2xl border border-[#D2E3FC] font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 cursor-pointer shadow-2xs"
                 >
                   <Fingerprint size={20} className={isBioLoading ? "animate-pulse" : ""} />
-                  <span>{isBioLoading ? "Verifying..." : "Unlock with Fingerprint"}</span>
+                  <span>{isBioLoading ? "Verifying Fingerprint..." : "Unlock with Fingerprint"}</span>
                 </button>
 
                 <button
@@ -813,15 +783,12 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                   onClick={() => {
                     setOnboardingCompleted(true);
                     setStoredAuthState(true);
-                    setSuccessMessage(`Instant Login! Welcome, ${selectedLoginUser.name}!`);
+                    setSuccessMessage(`Welcome back, ${selectedLoginUser.name}! Restoring cloud backup...`);
                     setTimeout(() => onLogin(selectedLoginUser), 400);
                   }}
                   className="w-full p-3 bg-white hover:bg-[#F8F9FA] text-[#202124] rounded-2xl border border-[#DADCE0] font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <div className="w-4 h-4 rounded-full flex items-center justify-center font-bold text-[10px] text-[#1A73E8]">
-                    G
-                  </div>
-                  <span>Fast 1-Click Login ({selectedLoginUser.name})</span>
+                  <span>1-Click Direct Unlock ({selectedLoginUser.name})</span>
                 </button>
               </div>
             )}
@@ -829,8 +796,231 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* BOTTOM TOGGLE LINK: Sign Up <-> Log In                                     */}
+        {/* MODE 2: SIGN UP / PROFILE CREATION                                        */}
         {/* ========================================================================= */}
+        {mode === "signup" && (
+          <form onSubmit={handleSignUpSubmit} className="space-y-3.5 py-3">
+            {/* 1-Click Google Sign-Up Top Shortcut */}
+            <button
+              type="button"
+              disabled={isGoogleAuthLoading}
+              onClick={handleGoogleSignInUnified}
+              className="w-full py-2.5 px-4 bg-white hover:bg-[#F8F9FA] text-[#202124] font-semibold text-xs rounded-2xl border border-[#DADCE0] transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+            >
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+              <span>1-Click Sign Up with Google</span>
+            </button>
+
+            <div className="relative flex items-center justify-center">
+              <div className="border-t border-[#E8EAED] w-full"></div>
+              <span className="bg-white px-2 text-[10px] uppercase font-bold text-[#80868B] shrink-0 tracking-wider">
+                Or Enter Details
+              </span>
+            </div>
+
+            {/* Full Name */}
+            <div>
+              <label className="text-xs font-semibold text-[#5F6368] block mb-1">
+                Full Name *
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5F6368]" size={16} />
+                <input
+                  id="signup-fullname"
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Ramkeval Chauhan"
+                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/20 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Account Type / Category */}
+            <div>
+              <label className="text-xs font-semibold text-[#5F6368] block mb-1">
+                Account Type / Category *
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setAccountType("Personal")}
+                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                    accountType === "Personal"
+                      ? "bg-[#E8F0FE] border-[#1A73E8] text-[#1A73E8] font-bold shadow-2xs"
+                      : "bg-[#F8F9FA] border-[#DADCE0] text-[#5F6368] hover:bg-white"
+                  }`}
+                >
+                  <User size={15} />
+                  <span className="text-[11px]">Personal</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountType("Business / Shop")}
+                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                    accountType === "Business / Shop"
+                      ? "bg-[#E6F4EA] border-[#188038] text-[#188038] font-bold shadow-2xs"
+                      : "bg-[#F8F9FA] border-[#DADCE0] text-[#5F6368] hover:bg-white"
+                  }`}
+                >
+                  <Building2 size={15} />
+                  <span className="text-[11px] truncate w-full">Business / Kirana</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountType("Household & Family")}
+                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                    accountType === "Household & Family"
+                      ? "bg-[#FEF7E0] border-[#E37400] text-[#E37400] font-bold shadow-2xs"
+                      : "bg-[#F8F9FA] border-[#DADCE0] text-[#5F6368] hover:bg-white"
+                  }`}
+                >
+                  <Users size={15} />
+                  <span className="text-[11px] truncate w-full">Household</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Email & Phone Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label className="text-xs font-semibold text-[#5F6368] block mb-1">
+                  Email Address *
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5F6368]" size={16} />
+                  <input
+                    id="signup-email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="chauhanramkeval@gmail.com"
+                    className="w-full pl-9 pr-2 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-[#5F6368] block mb-1">
+                  Mobile Number *
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5F6368]" size={16} />
+                  <input
+                    id="signup-phone"
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="w-full pl-9 pr-2 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* UPI ID (Optional) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-[#5F6368]">
+                  UPI ID <span className="text-[#80868B] font-normal">(Optional for QR Payments)</span>
+                </label>
+                <span className="text-[10px] font-bold text-[#1A73E8] bg-[#E8F0FE] px-1.5 py-0.2 rounded-md">
+                  UPI Enabled
+                </span>
+              </div>
+              <div className="relative">
+                <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5F6368]" size={16} />
+                <input
+                  id="signup-upi"
+                  type="text"
+                  value={upiId}
+                  onChange={(e) => setUpiId(e.target.value)}
+                  placeholder="ramkeval@okhdfcbank"
+                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none font-mono"
+                />
+              </div>
+            </div>
+
+            {/* 4-Digit Security PIN */}
+            <div className="p-3.5 bg-[#F8F9FA] rounded-2xl border border-[#E8EAED] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[#202124] flex items-center gap-1.5">
+                  <KeyRound size={15} className="text-[#1A73E8]" />
+                  <span>Set 4-Digit Security PIN *</span>
+                </span>
+                <span className="text-[10px] text-[#137333] font-bold bg-[#E6F4EA] px-2 py-0.5 rounded-full border border-[#CEEAD6]">
+                  Data Encryption
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <input
+                    id="signup-pin"
+                    type={showSignupPin ? "text" : "password"}
+                    maxLength={4}
+                    inputMode="numeric"
+                    required
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="••••"
+                    className="w-32 py-2 pl-3 pr-8 text-center text-base font-bold bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none tracking-widest font-mono shadow-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSignupPin(!showSignupPin)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5F6368] hover:text-[#1A73E8] cursor-pointer"
+                    title={showSignupPin ? "Hide PIN" : "Show PIN"}
+                    aria-label={showSignupPin ? "Hide PIN" : "Show PIN"}
+                  >
+                    {showSignupPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPin("1234")}
+                  className="text-[11px] font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-2.5 py-1.5 rounded-xl border border-[#D2E3FC] transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <Sparkles size={12} />
+                  <span>Use Default (1234)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Create Account Action */}
+            <button
+              id="btn-signup-submit"
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3 px-4 bg-[#1A73E8] hover:bg-[#1557B0] text-white font-bold text-sm rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+            >
+              <span>{isSubmitting ? "Creating & Syncing Khata..." : "Create Account & Start Khata"}</span>
+              <ArrowRight size={16} />
+            </button>
+          </form>
+        )}
+
+        {/* Bottom Switch Link */}
         <div className="pt-3 border-t border-[#F1F3F4] text-center">
           {mode === "signup" ? (
             <p className="text-xs text-[#5F6368]">
@@ -841,7 +1031,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                 onClick={() => setMode("login")}
                 className="font-bold text-[#1A73E8] hover:underline cursor-pointer inline-flex items-center gap-0.5 ml-1"
               >
-                <span>Log In with PIN</span>
+                <span>Log In & Restore Backup</span>
                 <ChevronRight size={13} />
               </button>
             </p>
@@ -854,7 +1044,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                 onClick={() => setMode("signup")}
                 className="font-bold text-[#1A73E8] hover:underline cursor-pointer inline-flex items-center gap-0.5 ml-1"
               >
-                <span>Create Khata / Sign Up</span>
+                <span>Create New Account</span>
                 <ChevronRight size={13} />
               </button>
             </p>
