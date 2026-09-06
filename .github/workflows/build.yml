@@ -2,6 +2,9 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -11,10 +14,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Setup Java JDK 21
         uses: actions/setup-java@v4
@@ -25,14 +28,15 @@ jobs:
       - name: Install Dependencies and Build Web App
         run: |
           npm install
-          npx vite build
+          npm run build
 
       - name: Setup Capacitor and Android
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "RamExpenses" "com.ramkeval.expenses" --web-dir dist
-          npx cap add android
-          npx cap copy
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap sync android
 
       - name: Fix Duplicate Kotlin Classes
         run: |
@@ -60,5 +64,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Ram-Expenses-APK
+          name: Khata-Expense-Advisor-APK
           path: android/app/build/outputs/apk/debug/*.apk
