@@ -36,12 +36,12 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace "com.khata.financeadvisor"
+    namespace "com.ramkeval.chauhan"
     compileSdkVersion 34
 
     defaultConfig {
         // 1. Strictly Fixed Application ID (Package Name)
-        applicationId "com.khata.financeadvisor"
+        applicationId "com.ramkeval.chauhan"
         minSdkVersion 22
         targetSdkVersion 34
         

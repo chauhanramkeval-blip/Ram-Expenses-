@@ -105,10 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="flex items-center gap-1">
                 <h1 className="text-base sm:text-lg font-bold tracking-tight text-[#202124] flex items-center gap-1 leading-tight">
-                  Khata
-                  <span className="text-[10px] sm:text-xs font-semibold px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded bg-[#E8F0FE] text-[#1A73E8]">
-                    India
-                  </span>
+                  Ram Expenses
                 </h1>
               </div>
               <p className="text-[11px] text-[#5F6368] font-medium hidden md:block">

@@ -1,5 +1,5 @@
 {
-  "name": "Khata: Daily Expense & Finance Advisor",
+  "name": "Ramc-expences",
   "description": "Google Files styled daily expense tracker with category breakdown, interactive pie charts, and AI financial advice tailored for Indian users.",
   "requestFramePermissions": ["camera", "microphone", "geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
