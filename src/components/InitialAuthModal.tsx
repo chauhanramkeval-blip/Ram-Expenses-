@@ -416,11 +416,11 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
           </div>
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-[#202124] tracking-tight">
-              {mode === "login" ? "Welcome Back to Khata" : "Create New Khata Account"}
+              {mode === "login" ? "Welcome Back to Ram expenses" : "Create New Khata Account"}
             </h2>
             <p className="text-xs text-[#5F6368]">
               {mode === "login"
-                ? "Sign in with Google or select your profile to restore all saved records"
+                ? "Sign in with Google or enter your 4-digit PIN to access your account"
                 : "Register a profile to isolate your expenses with automatic cloud sync"}
             </p>
           </div>
@@ -514,66 +514,6 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                     : "Continue with Google (Auto-Detect Account)"}
                 </span>
               </button>
-            </div>
-
-            <div className="relative flex items-center justify-center">
-              <div className="border-t border-[#E8EAED] w-full"></div>
-              <span className="bg-white px-2 text-[10px] uppercase font-bold text-[#80868B] shrink-0 tracking-wider">
-                Or Sign In to Profile
-              </span>
-            </div>
-
-            {/* Account Selector Cards */}
-            <div>
-              <label className="text-xs font-semibold text-[#5F6368] block mb-1.5">
-                Saved Accounts:
-              </label>
-              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
-                {allUsers.map((u) => {
-                  const isSelected = u.id === selectedLoginUser.id;
-                  return (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedLoginUser(u);
-                        setLoginPin("");
-                        setLoginPassword("");
-                        setErrorMessage("");
-                      }}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-2xl text-left transition-all cursor-pointer border ${
-                        isSelected
-                          ? "bg-[#E8F0FE] border-[#1A73E8] text-[#1A73E8] font-bold shadow-2xs"
-                          : "bg-[#F8F9FA] border-[#E8EAED] text-[#202124] hover:bg-white"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div
-                          className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-xs shrink-0"
-                          style={{ backgroundColor: u.avatarColor || "#1A73E8" }}
-                        >
-                          {getInitials(u.name)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold truncate">{u.name}</div>
-                          <div className="text-[10px] text-[#5F6368] truncate">{u.email}</div>
-                        </div>
-                      </div>
-                      {isSelected ? (
-                        <span className="text-[10px] font-bold text-[#1A73E8] bg-white px-2.5 py-0.5 rounded-full border border-[#D2E3FC] shrink-0 flex items-center gap-1 shadow-2xs">
-                          <KeyRound size={11} className="text-[#1A73E8]" />
-                          <span>Selected</span>
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-medium text-[#5F6368] bg-white px-2 py-0.5 rounded-full border border-[#E8EAED] shrink-0 flex items-center gap-1">
-                          <Lock size={10} className="text-[#80868B]" />
-                          <span>Locked</span>
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
             {/* Login Mode Tabs (PIN vs Password vs Fast Unlock) */}
@@ -703,21 +643,6 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                     ⌫
                   </button>
                 </div>
-
-                {/* Auto Fill Shortcut */}
-                <div className="text-center pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginPin(targetPin);
-                      handleVerifyLoginPin(targetPin);
-                    }}
-                    className="text-[11px] font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-3 py-1 rounded-full border border-[#D2E3FC] transition-colors cursor-pointer inline-flex items-center gap-1"
-                  >
-                    <Sparkles size={12} />
-                    <span>Auto-Fill PIN ({targetPin})</span>
-                  </button>
-                </div>
               </div>
             )}
 
@@ -726,7 +651,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
               <form onSubmit={handlePasswordLoginSubmit} className="space-y-3">
                 <div>
                   <label className="text-xs font-semibold text-[#5F6368] block mb-1">
-                    Password for {selectedLoginUser.name}
+                    Account Password
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5F6368]" size={16} />
@@ -734,7 +659,7 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                       type={showPassword ? "text" : "password"}
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="Enter password (khata)"
+                      placeholder="Enter password"
                       className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm bg-white text-[#202124] rounded-xl border border-[#DADCE0] focus:border-[#1A73E8] outline-none"
                     />
                     <button
@@ -747,17 +672,10 @@ export const InitialAuthModal: React.FC<InitialAuthModalProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setLoginPassword(targetPassword)}
-                    className="text-[11px] font-semibold text-[#1A73E8] bg-[#E8F0FE] px-2.5 py-1 rounded-full"
-                  >
-                    Auto-Fill ({targetPassword})
-                  </button>
+                <div>
                   <button
                     type="submit"
-                    className="px-5 py-2 text-xs font-bold text-white bg-[#1A73E8] hover:bg-[#1557B0] rounded-full"
+                    className="w-full py-2.5 text-xs font-bold text-white bg-[#1A73E8] hover:bg-[#1557B0] rounded-xl shadow-xs transition-colors cursor-pointer"
                   >
                     Log In
                   </button>

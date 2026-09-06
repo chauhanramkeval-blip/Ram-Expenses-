@@ -557,17 +557,8 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
                   </button>
                 </div>
 
-                {/* Demo Helper & Forgot PIN */}
-                <div className="pt-2 flex items-center justify-between text-xs">
-                  <button
-                    type="button"
-                    onClick={handleQuickFillPin}
-                    className="text-[11px] font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-2.5 py-1 rounded-full border border-[#D2E3FC] transition-colors cursor-pointer flex items-center gap-1"
-                  >
-                    <Sparkles size={12} />
-                    <span>Auto-Fill (••••)</span>
-                  </button>
-
+                {/* Forgot PIN Link */}
+                <div className="pt-2 flex items-center justify-end text-xs">
                   <button
                     type="button"
                     onClick={() => setShowForgotModal(true)}
@@ -628,19 +619,11 @@ const ProfileLoginModalContent: React.FC<ProfileLoginModalProps> = ({
                   </div>
                 )}
 
-                <div className="flex items-center justify-between pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setPassword(targetPassword)}
-                    className="text-[11px] font-semibold text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] px-2.5 py-1 rounded-full border border-[#D2E3FC] transition-colors cursor-pointer"
-                  >
-                    Auto-Fill Password ({targetPassword})
-                  </button>
-
+                <div className="flex items-center justify-end pt-1">
                   <button
                     type="submit"
                     id="btn-submit-password-auth"
-                    className="px-5 py-2 text-xs font-bold text-white bg-[#1A73E8] hover:bg-[#1557B0] rounded-full shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                    className="w-full py-2.5 text-xs font-bold text-white bg-[#1A73E8] hover:bg-[#1557B0] rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <span>Authenticate</span>
                     <ArrowRight size={14} />
