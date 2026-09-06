@@ -1,0 +1,6 @@
+# Place your persistent release signing keystore inside android/app/khata-release-key.jks
+# Copy this file to android/key.properties (never commit secrets to public repositories)
+storePassword=khata_secure_pass_2026
+keyPassword=khata_secure_pass_2026
+keyAlias=khata_key_alias
+storeFile=../app/khata-release-key.jks

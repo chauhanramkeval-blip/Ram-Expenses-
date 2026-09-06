@@ -1,0 +1,111 @@
+apply plugin: 'com.android.application'
+
+// =========================================================================
+// Auto-Increment Version Code & Version Name Helper
+// =========================================================================
+def versionPropertiesFile = file('version.properties')
+def Properties versionProps = new Properties()
+
+if (versionPropertiesFile.canRead()) {
+    versionProps.load(new FileInputStream(versionPropertiesFile))
+} else {
+    versionProps['VERSION_CODE'] = '1'
+    versionProps['VERSION_NAME'] = '1.0.0'
+}
+
+def currentVersionCode = versionProps['VERSION_CODE'].toInteger()
+def currentVersionName = versionProps['VERSION_NAME']
+
+// Gradle task to bump versionCode automatically before build
+tasks.register('bumpVersionCode') {
+    doLast {
+        def newVersionCode = currentVersionCode + 1
+        versionProps['VERSION_CODE'] = newVersionCode.toString()
+        versionProps.store(versionPropertiesFile.newWriter(), null)
+        println(">>> [Khata Build] Auto-incremented VersionCode: ${currentVersionCode} -> ${newVersionCode}")
+    }
+}
+
+// =========================================================================
+// Persistent Signing Configuration
+// =========================================================================
+def keystorePropertiesFile = rootProject.file("key.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace "com.khata.financeadvisor"
+    compileSdkVersion 34
+
+    defaultConfig {
+        // 1. Strictly Fixed Application ID (Package Name)
+        applicationId "com.khata.financeadvisor"
+        minSdkVersion 22
+        targetSdkVersion 34
+        
+        // 2. Incremental Versioning for Clean In-Place App Updates
+        versionCode currentVersionCode
+        versionName currentVersionName
+        
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir
+             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            } else {
+                // Persistent fallback debug/release keystore to avoid random key regeneration
+                keyAlias 'khata_key_alias'
+                keyPassword 'khata_secure_pass_2026'
+                storeFile file('khata-release-key.jks')
+                storePassword 'khata_secure_pass_2026'
+            }
+        }
+        debug {
+            // Sign debug builds with the exact same persistent keystore so debug <-> release updates succeed without uninstall
+            if (keystorePropertiesFile.exists()) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            } else {
+                keyAlias 'khata_key_alias'
+                keyPassword 'khata_secure_pass_2026'
+                storeFile file('khata-release-key.jks')
+                storePassword 'khata_secure_pass_2026'
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            signingConfig signingConfigs.debug
+            applicationIdSuffix "" // DO NOT add .debug suffix to preserve same package ID
+            debuggable true
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
+    implementation 'androidx.core:core-splashscreen:1.0.1'
+}
+
+apply from: 'capacitor.build.gradle'
