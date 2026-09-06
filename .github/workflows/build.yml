@@ -29,7 +29,9 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npm run build
-          if [ ! -d "android" ]; then
+          # Agar android folder me gradlew missing hai to fresh create karein
+          if [ ! -f "android/gradlew" ]; then
+            rm -rf android
             npx cap add android
           fi
           npx cap sync android
@@ -61,4 +63,5 @@ jobs:
         with:
           name: Khata-Expense-Advisor-APK
           path: android/app/build/outputs/apk/debug/*.apk
+
 
